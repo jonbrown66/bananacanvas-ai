@@ -9,6 +9,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+[![Demo](https://img.shields.io/badge/Live-Demo-orange?style=flat-square&logo=vercel)](https://bananacanvas-ai.vercel.app/)
 
 [English](README.md) | [中文说明](README_CN.md)
 
