@@ -90,6 +90,11 @@ export default function App({
   }, [userName, userEmail, avatarUrl]);
 
   const loadMessagesForProject = async (projectId: string) => {
+    if (!projectId || projectId === 'temp' || projectId === '') {
+      console.warn("Skipping message load for invalid project ID:", projectId);
+      return;
+    }
+
     setLoadingMessages(true);
     try {
       const { data, error } = await supabase
@@ -100,7 +105,12 @@ export default function App({
         .returns<Database['public']['Tables']['messages']['Row'][]>();
 
       if (error) {
-        console.error("Failed to load messages", error);
+        console.error(`Supabase error loading messages for project ${projectId}:`, {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return;
       }
 
@@ -150,6 +160,7 @@ export default function App({
   };
 
   const touchProject = async (projectId: string) => {
+    if (!projectId || projectId === 'temp') return;
     const nowIso = new Date().toISOString();
     // Cast to any because of Supabase type inference issue
     await supabase.from('projects').update({ last_modified: nowIso } as any).eq('id', projectId);
@@ -623,28 +634,58 @@ export default function App({
                 key="session-loading"
                 className="flex-1 flex flex-col lg:flex-row w-full h-full bg-muted/30"
               >
-                {/* Fake Sidebar Area for Context */}
-                <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-1/2 lg:h-full p-6 space-y-6">
-                  <div className="flex gap-4">
-                    <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
-                    <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
-                  </div>
-                  <div className="flex gap-4 flex-row-reverse">
-                    <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
-                    <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tr-sm" />
-                  </div>
-                  <div className="flex-1" />
-                  {/* Fake Input */}
-                  <Skeleton className="h-14 w-full rounded-xl" />
-                </div>
+                {viewMode === 'canvas' ? (
+                  /* Canvas Centric Loading Skeleton */
+                  <div className="flex-1 relative w-full h-full bg-background overflow-hidden">
+                    {/* Fake Grid Background Pattern */}
+                    <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+                      style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
-                {/* Fake Canvas Area */}
-                <div className="w-full lg:w-1/2 h-1/2 lg:h-full flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-4 text-muted-foreground/50">
-                    <Loader2 className="animate-spin" size={32} />
-                    <span className="text-sm font-medium animate-pulse">{t('loadingWorkspace') || 'Loading...'}</span>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-6">
+                        <div className="relative">
+                          <Loader2 className="animate-spin text-primary/40" size={48} />
+                          <div className="absolute inset-0 border-2 border-primary/20 rounded-full animate-ping scale-75" />
+                        </div>
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em] animate-pulse">
+                            {t('loadingWorkspace')}
+                          </span>
+                          <div className="w-32 h-1 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary/30 animate-[skeletonShimmer_2s_infinite]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fake Floating Toolbars or Nodes in distance */}
+                    <Skeleton className="absolute top-8 left-8 w-48 h-12 rounded-xl border border-border/50 opacity-20" />
+                    <Skeleton className="absolute bottom-8 right-8 w-64 h-32 rounded-2xl border border-border/50 opacity-20" />
                   </div>
-                </div>
+                ) : (
+                  /* Chat Flow Loading Skeleton (Original) */
+                  <>
+                    <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-1/2 lg:h-full p-6 space-y-6">
+                      <div className="flex gap-4">
+                        <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                        <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
+                      </div>
+                      <div className="flex gap-4 flex-row-reverse">
+                        <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                        <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tr-sm" />
+                      </div>
+                      <div className="flex-1" />
+                      <Skeleton className="h-14 w-full rounded-xl" />
+                    </div>
+
+                    <div className="w-full lg:w-1/2 h-1/2 lg:h-full flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-4 text-muted-foreground/50">
+                        <Loader2 className="animate-spin" size={32} />
+                        <span className="text-sm font-medium animate-pulse">{t('loadingWorkspace') || 'Loading...'}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : viewMode === 'chat' ? (
               <div

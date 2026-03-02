@@ -61,6 +61,8 @@
         "loadingWorkspace": "正在加载工作区...",
         "delete": "删除",
         "language": "语言",
+        "collapseSidebar": "折叠侧边栏",
+        "expandSidebar": "展开侧边栏",
         "pts": "分"
     },
     "Chat": {

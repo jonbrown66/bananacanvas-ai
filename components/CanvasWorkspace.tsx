@@ -173,17 +173,31 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const selectedMessage = messages.find(m => m.id === selectedNodeId);
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Zoom on wheel scroll by 15% each step
-    if (e.deltaY === 0) return;
+    if (e.deltaY === 0 || !containerRef.current) return;
 
     const zoomFactor = 1.15;
     const isZoomIn = e.deltaY < 0;
+    const factor = isZoomIn ? zoomFactor : 1 / zoomFactor;
 
-    setScale(prev => {
-      const newScale = isZoomIn ? prev * zoomFactor : prev / zoomFactor;
-      // Keep scale within [0.1, 4] min/max limits
-      return Math.min(Math.max(0.1, newScale), 4);
-    });
+    const rect = containerRef.current.getBoundingClientRect();
+
+    // Mouse position relative to the container
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Current canvas coordinates under the mouse
+    const canvasX = (mouseX - fastPosition.current.x) / scale;
+    const canvasY = (mouseY - fastPosition.current.y) / scale;
+
+    const newScale = Math.min(Math.max(0.1, scale * factor), 4);
+
+    // New translation to keep (canvasX, canvasY) under (mouseX, mouseY)
+    const newX = mouseX - canvasX * newScale;
+    const newY = mouseY - canvasY * newScale;
+
+    setScale(newScale);
+    setPosition({ x: newX, y: newY });
+    fastPosition.current = { x: newX, y: newY };
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -395,7 +409,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
       <div
         ref={contentRef}
-        className="absolute inset-0 origin-center"
+        className="absolute inset-0 origin-top-left"
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`
         }}

@@ -8,6 +8,7 @@ import { Providers } from "../providers";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: {
     default: "BananaCanvas AI",
     template: "%s | BananaCanvas AI"

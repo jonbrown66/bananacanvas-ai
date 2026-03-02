@@ -116,22 +116,32 @@ export const CanvasNode = memo(({
             )}
             <div className={cn(nodeCardVariants({ isSelected: isPlaceholder ? false : isSelected }))}>
                 {/* Header Handle */}
-                <div className={cn(headerVariants({ role: msg.role }))}>
-                    <div className="flex items-center gap-2">
-                        <div className={cn(avatarVariants({ role: msg.role }))}>
-                            {msg.role === 'user' ? 'U' : 'AI'}
-                        </div>
-                        {isPlaceholder ? (
-                            <div className="skeleton-bar h-3 w-16" />
-                        ) : (
+                <div className={cn(
+                    headerVariants({ role: msg.role }),
+                    isPlaceholder && "bg-muted/30 border-muted/50 justify-center py-2"
+                )}>
+                    {!isPlaceholder && (
+                        <div className="flex items-center gap-2">
+                            <div className={cn(avatarVariants({ role: msg.role }))}>
+                                {msg.role === 'user' ? 'U' : 'AI'}
+                            </div>
                             <span className={cn(
                                 "text-xs font-semibold text-muted-foreground uppercase",
                                 !isChinese && "tracking-wide"
                             )}>
                                 {msg.role === 'user' ? t('prompt') : t('result')}
                             </span>
-                        )}
-                    </div>
+                        </div>
+                    )}
+
+                    {isPlaceholder && (
+                        <div className="flex items-center gap-1.5 py-0.5">
+                            <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+                                {t('generating')}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Menu Trigger & Dropdown — hidden for placeholders */}
                     {!isPlaceholder && (
@@ -177,19 +187,25 @@ export const CanvasNode = memo(({
                 {/* Body */}
                 <div className="p-4 bg-card relative group-node-content rounded-b-2xl">
                     {isPlaceholder ? (
-                        /* Skeleton placeholder content */
-                        <div className="space-y-3">
-                            {/* Fake text lines */}
-                            <div className="skeleton-bar h-3 w-full" />
-                            <div className="skeleton-bar h-3 w-3/4" />
-                            {/* Fake image area */}
-                            <div className="skeleton-bar h-[200px] w-full rounded-xl" />
-                            {/* Status text */}
-                            <div className="flex items-center gap-2 pt-1">
-                                <Icons.Magic size={14} className="text-primary animate-spin" />
-                                <span className="text-xs text-muted-foreground animate-pulse">
-                                    {msg.text || t('generating')}
-                                </span>
+                        /* Skeleton placeholder content - Canvas Style */
+                        <div className="space-y-4 py-2">
+                            {/* Generating Indicator with text */}
+                            <div className="flex flex-col items-center justify-center gap-4 py-8 border-2 border-dashed border-muted/50 rounded-xl bg-muted/5">
+                                <div className="relative">
+                                    <Icons.Magic size={32} className="text-primary/40 animate-pulse" />
+                                    <div className="absolute inset-0 border-2 border-primary/20 rounded-full animate-ping scale-75" />
+                                </div>
+                                <div className="space-y-2 text-center">
+                                    <p className="text-xs font-medium text-muted-foreground/80 lowercase italic px-4">
+                                        {msg.text || "..."}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Subtle progress bars at bottom */}
+                            <div className="space-y-1.5 opacity-40">
+                                <div className="skeleton-bar h-1.5 w-full rounded-full" />
+                                <div className="skeleton-bar h-1.5 w-2/3 rounded-full" />
                             </div>
                         </div>
                     ) : (

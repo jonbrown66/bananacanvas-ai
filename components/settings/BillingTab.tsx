@@ -72,7 +72,12 @@ export function BillingTab({ billingProfile, onNavigate }: BillingTabProps) {
                         </div>
                     </div>
                     <Button
-                        className="w-full"
+                        className={cn(
+                            "w-full font-bold transition-all",
+                            billingProfile.plan === 'business'
+                                ? "bg-muted text-muted-foreground cursor-default hover:bg-muted"
+                                : "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                        )}
                         onClick={() => handleCheckout(billingProfile.plan === 'pro' ? BUSINESS_PLAN_PRODUCT_ID : PRO_PLAN_PRODUCT_ID)}
                         disabled={loading || billingProfile.plan === 'business'}
                     >
@@ -119,8 +124,12 @@ export function BillingTab({ billingProfile, onNavigate }: BillingTabProps) {
                             <p className="text-xs text-muted-foreground flex-1 leading-relaxed">{pkg.desc}</p>
                             <Button
                                 size="sm"
-                                className="w-full mt-1"
-                                variant={pkg.highlight ? "default" : "secondary"}
+                                className={cn(
+                                    "w-full mt-1 font-semibold transition-all duration-300",
+                                    pkg.highlight
+                                        ? "bg-primary hover:bg-primary/90 shadow-[0_0_15px_rgba(var(--primary),0.3)]"
+                                        : "bg-orange-600 hover:bg-orange-500 text-white border-none shadow-sm"
+                                )}
                                 onClick={() => handleCheckout(pkg.productId)}
                                 disabled={loading}
                             >

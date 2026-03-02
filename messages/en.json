@@ -61,6 +61,8 @@
         "loadingWorkspace": "Loading workspace...",
         "delete": "Delete",
         "language": "Language",
+        "collapseSidebar": "Collapse Sidebar",
+        "expandSidebar": "Expand Sidebar",
         "pts": "pts"
     },
     "Chat": {
