@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
+const Markdown = ReactMarkdown as any;
 import { Message } from '../../types';
 import { Icons } from '../Icons';
 import {

@@ -24,4 +24,13 @@ out
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+# Local env files
+.env*.local
+.env
+
+# Playwright
+.playwright-mcp
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
