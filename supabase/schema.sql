@@ -8,7 +8,7 @@ create table if not exists public.profiles (
   email text unique,
   display_name text,
   avatar_url text,
-  credits integer default 1000,
+  credits integer default 100,
   plan text default 'free',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
