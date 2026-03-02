@@ -11,7 +11,6 @@ export default function AppPage() {
   const { supabase, session } = useSupabase();
   const [loading, setLoading] = useState(false);
   const userEmail = session?.user?.email || "";
-  const initials = userEmail ? userEmail.slice(0, 2).toUpperCase() : "U";
 
   const viewParam = searchParams?.get("view");
   const sessionIdParam = searchParams?.get("sessionId");

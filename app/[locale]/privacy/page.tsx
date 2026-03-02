@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
                     <section>
                         <h2 className="text-2xl font-bold mb-4">1. Introduction</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            Welcome to BananaCanvas AI ("we," "our," or "us"). We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and use our AI image generation services, and tell you about your privacy rights and how the law protects you.
+                            Welcome to BananaCanvas AI (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and use our AI image generation services, and tell you about your privacy rights and how the law protects you.
                         </p>
                     </section>
 
@@ -60,7 +60,7 @@ export default function PrivacyPolicy() {
                     <section>
                         <h2 className="text-2xl font-bold mb-4">5. Third-Party Services</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            Our service may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party's site. We strongly advise you to review the Privacy Policy of every site you visit. We use third-party payment processors (e.g., LemonSqueezy, Stripe) and do not store your full credit card information on our servers.
+                            Our service may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party&apos;s site. We strongly advise you to review the Privacy Policy of every site you visit. We use third-party payment processors (e.g., LemonSqueezy, Stripe) and do not store your full credit card information on our servers.
                         </p>
                     </section>
 

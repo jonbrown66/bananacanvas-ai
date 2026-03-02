@@ -26,8 +26,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: result.error.issues[0].message }, { status: 400 });
         }
 
-        const { checkout_id, order_id, customer_id, product_id, signature, subscription_id } = result.data;
-
         // Note: Verify signature using process.env.CREEM_API_KEY or SECRET if available
         // For now, we trust the params but ensure idempotency
 
@@ -49,18 +47,6 @@ export async function GET(request: NextRequest) {
                         }
                     },
                 },
-            }
-        );
-
-        // Admin client for DB writes to bypass RLS
-        const supabaseAdmin = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            {
-                cookies: {
-                    getAll() { return [] },
-                    setAll() { }
-                }
             }
         );
 

@@ -18,14 +18,14 @@ export default function TermsOfService() {
                     <section>
                         <h2 className="text-2xl font-bold mb-4">1. Acceptance of Terms</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            By accessing or using the BananaCanvas AI website and services ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of the terms, then you may not access the Service.
+                            By accessing or using the BananaCanvas AI website and services (&quot;Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of the terms, then you may not access the Service.
                         </p>
                     </section>
 
                     <section>
                         <h2 className="text-2xl font-bold mb-4">2. Description of Service</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            BananaCanvas AI provides an artificial intelligence-powered platform for generating and editing images ("Generations"). You understand that the Service uses experimental technology and may produce unpredictable results.
+                            BananaCanvas AI provides an artificial intelligence-powered platform for generating and editing images (&quot;Generations&quot;). You understand that the Service uses experimental technology and may produce unpredictable results.
                         </p>
                     </section>
 
@@ -42,7 +42,7 @@ export default function TermsOfService() {
                             You agree not to use the Service to generate content that:
                         </p>
                         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-                            <li>Is illegal, harmful, threatening, abusive, harassing, tortious, defamatory, vulgar, obscene, libelous, invasive of another's privacy, hateful, or racially, ethnically or otherwise objectionable.</li>
+                            <li>Is illegal, harmful, threatening, abusive, harassing, tortious, defamatory, vulgar, obscene, libelous, invasive of another&apos;s privacy, hateful, or racially, ethnically or otherwise objectionable.</li>
                             <li>Infringes any patent, trademark, trade secret, copyright, or other proprietary rights of any party.</li>
                             <li>Depicts sexual violence and nonconsensual sexual content.</li>
                             <li>Promotes illegal acts.</li>
@@ -55,7 +55,7 @@ export default function TermsOfService() {
                     <section>
                         <h2 className="text-2xl font-bold mb-4">5. Intellectual Property Rights</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            Subject to your compliance with these Terms, you own all rights, title, and interest in and to the images you generate using the Service ("Output"). You grant BananaCanvas AI a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute the Output for the purpose of operating, promoting, and improving the Service.
+                            Subject to your compliance with these Terms, you own all rights, title, and interest in and to the images you generate using the Service (&quot;Output&quot;). You grant BananaCanvas AI a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute the Output for the purpose of operating, promoting, and improving the Service.
                         </p>
                     </section>
 
