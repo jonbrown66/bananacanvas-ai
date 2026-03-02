@@ -17,6 +17,11 @@ export const LandingPage = () => {
     const { supabase, session } = useSupabase();
     const [plan, setPlan] = useState<string>('free');
     const [notification, setNotification] = useState<{ message: string, show: boolean }>({ message: '', show: false });
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -37,8 +42,10 @@ export const LandingPage = () => {
         setNotification({ message, show: true });
     };
 
+    if (!mounted) return <div className="min-h-screen bg-background" />;
+
     return (
-        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand-DEFAULT/30 selection:text-brand-light" suppressHydrationWarning>
+        <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand-DEFAULT/30 selection:text-brand-light">
             <Navbar />
             <HeroSection />
             <FeaturesSection />

@@ -49,7 +49,7 @@ export const GallerySection = () => {
                                     src={src}
                                     alt={`Gallery Image ${i + 1}`}
                                     fill
-                                    className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110"
+                                    className="object-cover transition-transform duration-1500 ease-out group-hover:scale-110"
                                     sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                                 />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-700 pointer-events-none" />

@@ -251,7 +251,11 @@
 
 .animate-border-beam {
   background-size: 200% 200%;
-  animation: border-beam 4s ease infinite;
+  animation: border-beam 4000ms ease infinite;
+}
+
+.duration-1500 {
+  animation-duration: 1500ms;
 }
 
 /* 悬停下划线展开动画 */
