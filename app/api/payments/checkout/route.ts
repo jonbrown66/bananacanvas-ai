@@ -9,15 +9,15 @@ export const dynamic = "force-dynamic";
 const creemCheckout = Checkout({
     apiKey: process.env.CREEM_API_KEY!,
     testMode: process.env.NODE_ENV !== "production",
-    defaultSuccessUrl: "/app/settings/billing/success",
+    defaultSuccessUrl: "/app?view=settings&tab=billing",
 });
 
 const QuerySchema = z.object({
     productId: z.string().min(1, "Product ID is required"),
-    redirectUrl: z.string().url().optional()
+    redirectUrl: z.string().optional()
 });
 
-export async function GET(request: NextRequest) {
+async function handleCheckout(request: NextRequest) {
     try {
         const url = new URL(request.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
                     getAll() {
                         return cookieStore.getAll();
                     },
-                    setAll(cookiesToSet) {
+                    setAll(cookiesToSet: { name: string; value: string; options: Record<string, unknown> }[]) {
                         try {
-                            cookiesToSet.forEach(({ name, value, options }) =>
+                            cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options: Record<string, unknown> }) =>
                                 cookieStore.set(name, value, options)
                             );
                         } catch {
@@ -61,11 +61,17 @@ export async function GET(request: NextRequest) {
         }
 
         // Pass the request to the Creem SDK handler
-        // The SDK should handle reading productId from query params
-        // We append user_id to the query params so the SDK forwards it to Creem
-        url.searchParams.set('user_id', user.id);
-        // Also try setting metadata directly if supported via query params
-        url.searchParams.set('metadata[user_id]', user.id);
+        // The SDK reads 'metadata' (JSON string), 'referenceId', and 'successUrl' from query params
+        // Map our params to what the SDK expects
+        url.searchParams.set('metadata', JSON.stringify({ user_id: user.id }));
+        url.searchParams.set('referenceId', user.id);
+
+        // SDK expects 'successUrl' not 'redirectUrl' - map it
+        const redirectUrl = url.searchParams.get('redirectUrl');
+        if (redirectUrl) {
+            url.searchParams.set('successUrl', redirectUrl);
+            url.searchParams.delete('redirectUrl');
+        }
 
         const modifiedRequest = new NextRequest(url, request);
 
@@ -95,3 +101,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export const GET = handleCheckout;
+export const POST = handleCheckout;

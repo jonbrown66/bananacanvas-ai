@@ -15,14 +15,19 @@ export async function POST(request: Request) {
         const text = await request.text();
 
 
-        const hmac = crypto.createHmac('sha256', process.env.LEMONSQUEEZY_WEBHOOK_SECRET || '');
+        if (!process.env.LEMONSQUEEZY_WEBHOOK_SECRET) {
+            console.error('[Webhook] LEMONSQUEEZY_WEBHOOK_SECRET is not set');
+            return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+        }
+
+        const hmac = crypto.createHmac('sha256', process.env.LEMONSQUEEZY_WEBHOOK_SECRET);
         const digest = Buffer.from(hmac.update(text).digest('hex'), 'utf8');
         const signature = Buffer.from(signatureHeader || '', 'utf8');
 
         if (!crypto.timingSafeEqual(digest, signature)) {
             console.error('[Webhook] Invalid signature');
             console.error(`[Webhook] Expected: ${digest.toString()}, Got: ${signature.toString()}`);
-            // return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         } else {
 
         }
@@ -52,16 +57,23 @@ export async function POST(request: Request) {
 
 
             if (userId) {
-                await supabase.from('lemon_squeezy_orders').insert({
+                // 幂等性检查：查看该订单是否已处理过
+                const { data: existingOrder } = await supabase
+                    .from('lemon_squeezy_orders')
+                    .select('order_id')
+                    .eq('order_id', orderId)
+                    .maybeSingle();
+
+                await supabase.from('lemon_squeezy_orders').upsert({
                     user_id: userId,
                     order_id: orderId,
                     customer_id: customerId.toString(),
                     status,
                     total,
                     currency,
-                });
+                }, { onConflict: 'order_id' });
 
-                if (status === 'paid') {
+                if (status === 'paid' && !existingOrder) {
                     // Update customer_id
                     await supabase.from('profiles').update({
                         lemon_squeezy_customer_id: customerId.toString()
@@ -84,23 +96,29 @@ export async function POST(request: Request) {
                     if (variantId && CREDIT_PACKAGES[variantId]) {
                         const creditsToAdd = CREDIT_PACKAGES[variantId];
 
-                        // Fetch current credits
+                        // Fetch current credits to check if user exists in profile
                         const { data: profile, error: fetchError } = await supabase
                             .from('profiles')
-                            .select('credits')
+                            .select('id')
                             .eq('id', userId)
                             .single();
 
                         if (!fetchError && profile) {
-                            const newCredits = (profile.credits || 0) + creditsToAdd;
-                            const { error: updateError } = await supabase.from('profiles').update({
-                                credits: newCredits
-                            }).eq('id', userId);
+                            // Use the secure RPC function to prevent race conditions
+                            const { error: updateError } = await supabase.rpc('increment_credits', {
+                                p_user_id: userId,
+                                p_amount: creditsToAdd
+                            });
 
                             if (updateError) {
                                 console.error(`[Webhook] Failed to update credits for user ${userId}:`, updateError);
                             } else {
-
+                                // Add transaction record
+                                await supabase.from('credit_transactions').insert({
+                                    user_id: userId,
+                                    amount: creditsToAdd,
+                                    source: 'LemonSqueezy Payment'
+                                });
                             }
                         } else {
                             console.error(`[Webhook] Failed to fetch profile for user ${userId} to add credits`);

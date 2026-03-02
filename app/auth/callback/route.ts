@@ -19,16 +19,27 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: any) {
-          response.cookies.set(name, value, options);
+        setAll(cookiesToSet: { name: string; value: string; options: Record<string, unknown> }[]) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
         },
-        remove(name: string, options: any) {
-          response.cookies.set(name, "", { ...options, maxAge: 0 });
-        }
-      }
+      },
+    }
+  );
+
+  // Admin client for DB writes to bypass RLS
+  const supabaseAdmin = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        getAll() { return []; },
+        setAll() { },
+      },
     }
   );
 
@@ -38,14 +49,14 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       // Check if profile exists
-      const { data: profile } = await supabase
+      const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('id, credits')
         .eq('id', user.id)
         .single();
 
       // Check for existing transactions to avoid duplicates
-      const { count } = await supabase
+      const { count } = await supabaseAdmin
         .from('credit_transactions')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
@@ -57,7 +68,7 @@ export async function GET(request: NextRequest) {
 
         if (!profile) {
           // Create new profile
-          await supabase.from('profiles').insert({
+          await supabaseAdmin.from('profiles').insert({
             id: user.id,
             email: user.email,
             credits: targetCredits,
@@ -67,12 +78,12 @@ export async function GET(request: NextRequest) {
           // Profile exists (likely from trigger), ensure credits are correct
           // This fixes the issue where DB default might have been 1000
           if (profile.credits !== targetCredits) {
-            await supabase.from('profiles').update({ credits: targetCredits }).eq('id', user.id);
+            await supabaseAdmin.from('profiles').update({ credits: targetCredits }).eq('id', user.id);
           }
         }
 
         // Record initial credit transactions
-        await supabase.from('credit_transactions').insert([
+        await supabaseAdmin.from('credit_transactions').insert([
           { user_id: user.id, amount: 50, source: 'Free Plan' },
           { user_id: user.id, amount: 50, source: 'New User Bonus' }
         ]);

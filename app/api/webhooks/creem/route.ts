@@ -11,7 +11,7 @@ const WebhookSchema = z.object({
     data: z.object({
         id: z.string(),
         product_id: z.string().optional(),
-        metadata: z.object({ user_id: z.string().optional() }).optional(),
+        metadata: z.object({ user_id: z.string().optional(), referenceId: z.string().optional() }).optional(),
         customer: z.object({ id: z.string() }).optional(),
         status: z.string().optional(),
         amount_total: z.number().optional(),
@@ -33,14 +33,17 @@ export async function POST(request: Request) {
 
 
         // Verify Signature
-        if (process.env.CREEM_WEBHOOK_SECRET) {
-            const hmac = crypto.createHmac('sha256', process.env.CREEM_WEBHOOK_SECRET);
-            const digest = hmac.update(text).digest('hex');
+        if (!process.env.CREEM_WEBHOOK_SECRET) {
+            console.error('[Creem Webhook] CREEM_WEBHOOK_SECRET is not set');
+            return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+        }
 
-            // Note: In production, you should strictly verify the signature.
-            // if (signatureHeader !== digest) {
-            //    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-            // }
+        const hmac = crypto.createHmac('sha256', process.env.CREEM_WEBHOOK_SECRET);
+        const digest = hmac.update(text).digest('hex');
+
+        if (signatureHeader !== digest) {
+            console.error('[Creem Webhook] Invalid signature');
+            return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
 
         const payload = JSON.parse(text);
@@ -63,18 +66,25 @@ export async function POST(request: Request) {
 
         if (event_type === 'checkout.completed') {
             const { id, product_id, metadata, customer, status, amount_total, currency } = data;
-            const userId = metadata?.user_id;
+            const userId = metadata?.user_id || metadata?.referenceId;
 
             if (userId && status === 'completed') {
-                // Record Order
-                await supabase.from('creem_orders').insert({
+                // 幂等性检查：查看该订单是否已处理过
+                const { data: existingOrder } = await supabase
+                    .from('creem_orders')
+                    .select('order_id')
+                    .eq('order_id', id)
+                    .maybeSingle();
+
+                // Record Order (upsert for idempotency)
+                await supabase.from('creem_orders').upsert({
                     user_id: userId,
                     order_id: id,
                     customer_id: customer?.id,
                     status: status,
                     amount: amount_total,
                     currency: currency
-                });
+                }, { onConflict: 'order_id' });
 
                 // Update Profile with Customer ID
                 if (customer?.id) {
@@ -83,24 +93,26 @@ export async function POST(request: Request) {
                     }).eq('id', userId);
                 }
 
-                // Add Credits
-                const CREDIT_PACKAGES: Record<string, number> = {
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_300!]: 300,
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_800!]: 800,
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_2800!]: 2800,
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_7200!]: 7200,
-                    // Subscriptions (initial purchase)
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_PRO!]: 880,
-                    [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_BUSINESS!]: 2880
-                };
+                // Add Credits - 仅在首次处理时发放，防止 webhook 重试导致重复积分
+                if (!existingOrder) {
+                    const CREDIT_PACKAGES: Record<string, number> = {
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_300!]: 300,
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_800!]: 800,
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_2800!]: 2800,
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_7200!]: 7200,
+                        // Subscriptions (initial purchase)
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_PRO!]: 880,
+                        [process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_BUSINESS!]: 2880
+                    };
 
-                const creditsToAdd = CREDIT_PACKAGES[product_id!];
-                if (creditsToAdd) {
-                    const { data: profile } = await supabase.from('profiles').select('credits').eq('id', userId).single();
-                    if (profile) {
-                        const newCredits = (profile.credits || 0) + creditsToAdd;
-                        await supabase.from('profiles').update({ credits: newCredits }).eq('id', userId);
-
+                    const creditsToAdd = CREDIT_PACKAGES[product_id!];
+                    if (creditsToAdd) {
+                        await supabase.rpc('increment_credits', { p_user_id: userId, p_amount: creditsToAdd });
+                        await supabase.from('credit_transactions').insert({
+                            user_id: userId,
+                            amount: creditsToAdd,
+                            source: 'Creem Webhook - Recharge'
+                        });
                     }
                 }
             }
@@ -147,12 +159,12 @@ export async function POST(request: Request) {
                         if (plan === 'business') renewalCredits = 2880;
 
                         if (renewalCredits > 0) {
-                            const { data: profile } = await supabase.from('profiles').select('credits').eq('id', userId).single();
-                            if (profile) {
-                                const newCredits = (profile.credits || 0) + renewalCredits;
-                                await supabase.from('profiles').update({ credits: newCredits }).eq('id', userId);
-
-                            }
+                            await supabase.rpc('increment_credits', { p_user_id: userId, p_amount: renewalCredits });
+                            await supabase.from('credit_transactions').insert({
+                                user_id: userId,
+                                amount: renewalCredits,
+                                source: `Creem Webhook - Subscription Renewal (${plan})`
+                            });
                         }
                     }
                 }

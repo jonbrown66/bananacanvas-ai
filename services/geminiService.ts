@@ -5,6 +5,27 @@ export interface GenerateImageParams {
   onStatusUpdate?: (status: string) => void;
 }
 
+const compressImageToWebP = async (base64Str: string, quality: number = 0.85): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str); // fallback if canvas fails
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const webpBase64 = canvas.toDataURL('image/webp', quality);
+      resolve(webpBase64);
+    };
+    img.onerror = () => resolve(base64Str); // fallback on error
+    img.src = base64Str;
+  });
+};
+
 export const generateOrEditImage = async (
   params: GenerateImageParams
 ): Promise<{ text?: string; imageUrl?: string }> => {
@@ -26,8 +47,19 @@ export const generateOrEditImage = async (
   }
 
   const data = await res.json();
+  let finalImageUrl = data.imageUrl || undefined;
+
+  if (finalImageUrl) {
+    params.onStatusUpdate?.("Optimizing image format...");
+    try {
+      finalImageUrl = await compressImageToWebP(finalImageUrl, 0.85);
+    } catch (e) {
+      console.warn("Failed to compress image to WebP", e);
+    }
+  }
+
   return {
     text: data.text || undefined,
-    imageUrl: data.imageUrl || undefined
+    imageUrl: finalImageUrl
   };
 };
