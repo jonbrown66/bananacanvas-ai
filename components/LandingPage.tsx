@@ -12,6 +12,7 @@ import { GallerySection } from "@/components/landing/GallerySection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 import { Footer } from "@/components/landing/Footer";
+import { Loader2 } from "lucide-react";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -44,7 +45,11 @@ export const LandingPage = () => {
         setNotification({ message, show: true });
     };
 
-    if (!mounted) return <div className="min-h-screen bg-background" />;
+    if (!mounted) return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand-DEFAULT/30 selection:text-brand-light">
