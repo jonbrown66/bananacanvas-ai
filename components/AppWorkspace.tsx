@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Sidebar } from './Sidebar';
@@ -11,7 +11,15 @@ import { generateOrEditImage } from '../services/geminiService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../lib/types';
 import { Loader2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { Skeleton } from './ui/skeleton';
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import { useWorkspaceStore } from '../lib/store';
 
 type MessageRow = Database['public']['Tables']['messages']['Row'];
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
@@ -52,23 +60,27 @@ export default function App({
   initialSessionId
 }: AppProps) {
   const t = useTranslations('Workspace');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Connect to global Zustand Store
+  const sidebarOpen = useWorkspaceStore(s => s.sidebarOpen);
+  const setSidebarOpen = useWorkspaceStore(s => s.setSidebarOpen);
+  const userProfile = useWorkspaceStore(s => s.userProfile);
+  const setUserProfile = useWorkspaceStore(s => s.setUserProfile);
+  const sessions = useWorkspaceStore(s => s.sessions);
+  const setSessions = useWorkspaceStore(s => s.setSessions);
+  const currentSessionId = useWorkspaceStore(s => s.currentSessionId);
+  const setCurrentSessionId = useWorkspaceStore(s => s.setCurrentSessionId);
+  const setSessionLoaded = useWorkspaceStore(s => s.setSessionLoaded);
+
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || 'chat');
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [appLoading, setAppLoading] = useState(true);
-
-  // User Data
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: userName,
-    email: userEmail,
-    credits: 0, // Start with 0, fetch real value
-    avatarUrl: avatarUrl || 'https://picsum.photos/200'
-  });
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   // Sync state with props (e.g. when session loads)
   useEffect(() => {
-    setUserProfile(prev => ({
+    setUserProfile((prev: UserProfile) => ({
       ...prev,
       name: userName || prev.name,
       email: userEmail || prev.email,
@@ -77,34 +89,36 @@ export default function App({
     }));
   }, [userName, userEmail, avatarUrl]);
 
-  // Sessions Data
-  const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('');
-
   const loadMessagesForProject = async (projectId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: true })
-      .returns<Database['public']['Tables']['messages']['Row'][]>();
+    setLoadingMessages(true);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true })
+        .returns<Database['public']['Tables']['messages']['Row'][]>();
 
-    if (error) {
-      console.error("Failed to load messages", error);
-      return;
+      if (error) {
+        console.error("Failed to load messages", error);
+        return;
+      }
+
+      const mapped: Message[] = (data || []).map((m) => ({
+        id: m.id,
+        role: m.author_role as 'user' | 'model',
+        text: m.content || '',
+        imageUrl: m.image_url || undefined,
+        timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+        parentId: m.parent_id || undefined,
+        position: { x: Number(m.position_x || 0), y: Number(m.position_y || 0) }
+      }));
+
+      // updateMessages from the store inherently sets isLoaded to true
+      useWorkspaceStore.getState().updateMessages(projectId, mapped);
+    } finally {
+      setLoadingMessages(false);
     }
-
-    const mapped: Message[] = (data || []).map((m) => ({
-      id: m.id,
-      role: m.author_role as 'user' | 'model',
-      text: m.content || '',
-      imageUrl: m.image_url || undefined,
-      timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
-      parentId: m.parent_id || undefined,
-      position: { x: Number(m.position_x || 0), y: Number(m.position_y || 0) }
-    }));
-
-    setSessions((prev) => prev.map((s) => (s.id === projectId ? { ...s, messages: mapped } : s)));
   };
 
   const createNewSession = async (title: string = t('newProject')) => {
@@ -127,7 +141,8 @@ export default function App({
       id: project.id,
       title: project.title,
       lastModified: project.last_modified ? new Date(project.last_modified).getTime() : Date.now(),
-      messages: []
+      messages: [],
+      isLoaded: true
     };
     setSessions((prev) => [newSession, ...prev]);
     setCurrentSessionId(project.id);
@@ -153,7 +168,7 @@ export default function App({
 
       if (!error && data) {
         const profile = data as Pick<ProfileRow, "credits" | "avatar_url" | "display_name">;
-        setUserProfile(prev => ({
+        setUserProfile((prev: UserProfile) => ({
           ...prev,
           credits: profile.credits ?? 0,
           avatarUrl: profile.avatar_url || prev.avatarUrl,
@@ -176,7 +191,7 @@ export default function App({
         },
         (payload) => {
           const next = (payload.new || payload.old) as ProfileRow;
-          setUserProfile((prev) => ({
+          setUserProfile((prev: UserProfile) => ({
             ...prev,
             credits: typeof next?.credits === "number" ? next.credits : prev.credits,
             avatarUrl: next?.avatar_url || prev.avatarUrl,
@@ -219,7 +234,8 @@ export default function App({
         id: p.id,
         title: p.title,
         lastModified: p.last_modified ? new Date(p.last_modified).getTime() : Date.now(),
-        messages: []
+        messages: [],
+        isLoaded: false
       }));
       setSessions(normalized);
 
@@ -232,8 +248,9 @@ export default function App({
         }
       }
 
+      // let the subsequent useEffect catch the !isLoaded state
+      // and do the heavy data loading without blocking the UI
       setCurrentSessionId(startId);
-      await loadMessagesForProject(startId);
       setAppLoading(false);
     };
 
@@ -243,10 +260,17 @@ export default function App({
   useEffect(() => {
     if (!currentSessionId) return;
     const target = sessions.find((s) => s.id === currentSessionId);
-    if (target && target.messages.length === 0) {
+    if (target && !target.isLoaded) {
       loadMessagesForProject(currentSessionId);
     }
   }, [currentSessionId, sessions]);
+
+  const handlePrefetchSession = (id: string) => {
+    const target = sessions.find((s) => s.id === id);
+    if (target && !target.isLoaded) {
+      loadMessagesForProject(id);
+    }
+  };
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || sessions[0] || { messages: [], id: 'temp', title: 'Loading', lastModified: 0 };
 
@@ -257,10 +281,10 @@ export default function App({
     await createNewSession();
   };
 
-  const handleDeleteSession = async (id: string) => {
+  const handleDeleteSession = useCallback(async (id: string) => {
     await supabase.from('projects').delete().eq('id', id);
-    setSessions(prev => {
-      const filtered = prev.filter(s => s.id !== id);
+    setSessions((prev: WorkspaceSession[]) => {
+      const filtered = prev.filter((s: WorkspaceSession) => s.id !== id);
       if (filtered.length === 0) {
         createNewSession();
       } else if (currentSessionId === id) {
@@ -268,23 +292,23 @@ export default function App({
       }
       return filtered;
     });
-  };
+  }, [supabase, currentSessionId, createNewSession, setCurrentSessionId, setSessions]);
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
     if (!window.confirm(t('deleteMessageConfirm'))) return;
     await supabase.from('messages').delete().eq('id', messageId);
     await touchProject(currentSessionId);
-    setSessions(prevSessions => prevSessions.map(s => {
+    setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) => {
       if (s.id !== currentSessionId) return s;
       return {
         ...s,
-        messages: s.messages.filter(m => m.id !== messageId),
+        messages: s.messages.filter((m: Message) => m.id !== messageId),
         lastModified: Date.now()
       };
     }));
-  };
+  }, [t, supabase, currentSessionId, touchProject, setSessions]);
 
-  const handleRegenerateMessage = (message: Message) => {
+  const handleRegenerateMessage = useCallback((message: Message) => {
     let promptText = "";
     let parentId = "";
     let sourceImage = undefined;
@@ -296,7 +320,6 @@ export default function App({
         promptText = parent.text;
         parentId = parent.parentId || ""; // Grandparent
         sourceImage = parent.imageUrl; // If the prompt had an image
-        isContext = !sourceImage;
         isContext = true;
       } else {
         return;
@@ -311,38 +334,28 @@ export default function App({
 
     if (promptText) {
       const base64 = sourceImage ? sourceImage.split(',')[1] : undefined;
+      // We need to use refs or carefully manage dependencies for handleSendMessage here to avoid circular dep
       handleSendMessage(promptText, base64, "1:1", parentId, isContext);
     }
-  };
+  }, [currentSession.messages]);// Caution: handleSendMessage is used inside
 
   // 2. Canvas Optimization: Update Node Position
-  const handleUpdateNodePosition = (nodeId: string, newPosition: { x: number; y: number }) => {
-    setSessions(prevSessions => prevSessions.map(s => {
-      if (s.id !== currentSessionId) return s;
-      return {
-        ...s,
-        messages: s.messages.map(m => m.id === nodeId ? { ...m, position: newPosition } : m),
-        lastModified: Date.now()
-      };
-    }));
+  const handleUpdateNodePosition = useCallback((nodeId: string, newPosition: { x: number; y: number }) => {
+    useWorkspaceStore.getState().updateNodePosition(currentSessionId, nodeId, newPosition);
     supabase.from('messages').update({ position_x: newPosition.x, position_y: newPosition.y } as any).eq('id', nodeId);
-  };
+  }, [currentSessionId, supabase]);
 
   // Batch update positions (Auto Layout)
-  const handleAutoLayout = (newPositions: Record<string, { x: number, y: number }>) => {
-    setSessions(prevSessions => prevSessions.map(s => {
-      if (s.id !== currentSessionId) return s;
-      return {
-        ...s,
-        messages: s.messages.map(m => newPositions[m.id] ? { ...m, position: newPositions[m.id] } : m),
-        lastModified: Date.now()
-      };
-    }));
+  const handleAutoLayout = useCallback((newPositions: Record<string, { x: number, y: number }>) => {
+    const currentMsgs = currentSession.messages;
+    const updatedMessages = currentMsgs.map((m: Message) => newPositions[m.id] ? { ...m, position: newPositions[m.id] } : m);
+    useWorkspaceStore.getState().updateMessages(currentSessionId, updatedMessages);
+
     const updates = Object.entries(newPositions).map(([id, pos]) =>
       supabase.from('messages').update({ position_x: pos.x, position_y: pos.y } as any).eq('id', id)
     );
     Promise.all(updates).catch(console.error);
-  };
+  }, [currentSession.messages, currentSessionId, supabase]);
 
   // Helper to calculate new node position based on parent
   const calculateNodePosition = (parentId?: string, currentMessages: Message[] = []) => {
@@ -389,6 +402,7 @@ export default function App({
     const effectiveParentId = parentId || (currentSession.messages.length > 0 ? currentSession.messages[currentSession.messages.length - 1].id : undefined);
     const userPos = calculateNodePosition(effectiveParentId, currentSession.messages);
     let userMsgId = "";
+    let placeholderId = "";
 
     setIsProcessing(true);
     setStatusMessage(t('processing'));
@@ -433,7 +447,7 @@ export default function App({
         await supabase.from('projects').update({ title: newTitle } as any).eq('id', currentSessionId);
       }
 
-      setSessions(prevSessions => prevSessions.map(s =>
+      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
         s.id === currentSessionId
           ? {
             ...s,
@@ -445,14 +459,46 @@ export default function App({
       ));
       await touchProject(currentSessionId);
 
+      // Insert a placeholder skeleton node immediately so the canvas shows it
+      const aiPos = { x: userPos.x + 450, y: userPos.y };
+      placeholderId = `placeholder-${Date.now()}`;
+      const placeholderMsg: Message = {
+        id: placeholderId,
+        role: 'model',
+        text: statusMessage || t('generating'),
+        timestamp: Date.now(),
+        parentId: userMsgId,
+        position: aiPos,
+        isPlaceholder: true
+      };
+      const messagesWithPlaceholder = [...updatedMessages, placeholderMsg];
+
+      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
+        s.id === currentSessionId
+          ? { ...s, messages: messagesWithPlaceholder, lastModified: Date.now() }
+          : s
+      ));
+
       const response = await generateOrEditImage({
         prompt: text,
         base64Image: currentImageBase64,
         aspectRatio: aspectRatio,
-        onStatusUpdate: (msg) => setStatusMessage(msg)
+        onStatusUpdate: (msg) => {
+          setStatusMessage(msg);
+          // Update placeholder text to show live status
+          setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
+            s.id === currentSessionId
+              ? {
+                ...s,
+                messages: s.messages.map((m: Message) =>
+                  m.id === placeholderId ? { ...m, text: msg } : m
+                )
+              }
+              : s
+          ));
+        }
       });
 
-      const aiPos = { x: userPos.x + 450, y: userPos.y };
       const aiContent = response.text || (response.imageUrl ? t('imageGenerated') : t('processedThat'));
 
       const { data: aiRow, error: aiError } = await supabase
@@ -484,18 +530,19 @@ export default function App({
         position: aiPos
       };
 
-      setSessions(prevSessions => prevSessions.map(s =>
+      // Replace the placeholder with the real AI message
+      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
         s.id === currentSessionId
           ? {
             ...s,
-            messages: [...updatedMessages, aiMsg],
+            messages: s.messages.map((m: Message) => m.id === placeholderId ? aiMsg : m),
             lastModified: Date.now()
           }
           : s
       ));
       await touchProject(currentSessionId);
       const newCredits = Math.max(0, userProfile.credits - 5);
-      setUserProfile(prev => ({ ...prev, credits: newCredits }));
+      setUserProfile((prev: UserProfile) => ({ ...prev, credits: newCredits }));
       if (userId) {
         await supabase.from('profiles').update({ credits: newCredits } as any).eq('id', userId);
 
@@ -511,20 +558,26 @@ export default function App({
     } catch (error: any) {
       console.error("Generation error:", error);
 
-      const aiPos = { x: userPos.x + 450, y: userPos.y };
       const errorMsg: Message = {
         id: Date.now().toString(),
         role: 'model',
         text: t('errorPrefix') + (error.message || t('unexpectedError')),
         timestamp: Date.now(),
         parentId: userMsgId || effectiveParentId,
-        position: aiPos
+        position: { x: userPos.x + 450, y: userPos.y }
       };
 
-      setSessions(prevSessions =>
-        prevSessions.map(s => {
+      // Replace placeholder with error message (or append if no placeholder)
+      setSessions((prevSessions: WorkspaceSession[]) =>
+        prevSessions.map((s: WorkspaceSession) => {
           if (s.id !== currentSessionId) return s;
-          return { ...s, messages: [...s.messages, errorMsg] };
+          const hasPlaceholder = s.messages.some((m: Message) => m.id === placeholderId);
+          return {
+            ...s,
+            messages: hasPlaceholder
+              ? s.messages.map((m: Message) => m.id === placeholderId ? errorMsg : m)
+              : [...s.messages, errorMsg]
+          };
         })
       );
     } finally {
@@ -545,87 +598,99 @@ export default function App({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        onNewSession={handleNewSession}
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        onSelectSession={setCurrentSessionId}
-        onDeleteSession={handleDeleteSession}
-        userProfile={userProfile}
-        onLogout={onLogout}
-        logoutLoading={logoutLoading}
-        onToggle={() => setSidebarOpen((v) => !v)}
-      />
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar
+          isOpen={sidebarOpen}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          onNewSession={handleNewSession}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSelectSession={setCurrentSessionId}
+          onDeleteSession={handleDeleteSession}
+          userProfile={userProfile}
+          onLogout={onLogout}
+          logoutLoading={logoutLoading}
+          onToggle={() => setSidebarOpen((v) => !v)}
+          onPrefetchSession={handlePrefetchSession}
+        />
 
-      <div className="flex-1 flex flex-col relative min-w-0">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute top-4 left-4 z-50 p-2 bg-background/80 backdrop-blur border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm transition-colors"
-        >
-          {sidebarOpen ? <Icons.SidebarClose size={20} /> : <Icons.SidebarOpen size={20} />}
-        </button>
+        <div className="flex-1 flex flex-col relative min-w-0">
+          <>
+            {!currentSession.isLoaded ? (
+              <div
+                key="session-loading"
+                className="flex-1 flex flex-col lg:flex-row w-full h-full bg-muted/30"
+              >
+                {/* Fake Sidebar Area for Context */}
+                <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-1/2 lg:h-full p-6 space-y-6">
+                  <div className="flex gap-4">
+                    <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                    <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
+                  </div>
+                  <div className="flex gap-4 flex-row-reverse">
+                    <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                    <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tr-sm" />
+                  </div>
+                  <div className="flex-1" />
+                  {/* Fake Input */}
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                </div>
 
-        <AnimatePresence mode="wait">
-          {viewMode === 'chat' ? (
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col h-full overflow-hidden"
-            >
-              <ChatWorkspace
-                messages={currentSession.messages}
-                onSendMessage={handleSendMessage}
-                isProcessing={isProcessing}
-                onDeleteMessage={handleDeleteMessage}
-                onRegenerateMessage={handleRegenerateMessage}
-                latestImage={latestImage}
-                statusMessage={statusMessage}
-              />
-            </motion.div>
-          ) : viewMode === 'settings' ? (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col h-full overflow-hidden"
-            >
-              <SettingsWorkspace onNavigate={(sessionId) => {
-                setCurrentSessionId(sessionId);
-                setViewMode('chat');
-              }} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="canvas"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col h-full overflow-hidden"
-            >
-              <CanvasWorkspace
-                messages={currentSession.messages}
-                onSendMessage={handleSendMessage}
-                onUpdateNodePosition={handleUpdateNodePosition}
-                onAutoLayout={handleAutoLayout}
-                isProcessing={isProcessing}
-                onDeleteMessage={handleDeleteMessage}
-                onRegenerateMessage={handleRegenerateMessage}
-                statusMessage={statusMessage}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {/* Fake Canvas Area */}
+                <div className="w-full lg:w-1/2 h-1/2 lg:h-full flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-4 text-muted-foreground/50">
+                    <Loader2 className="animate-spin" size={32} />
+                    <span className="text-sm font-medium animate-pulse">{t('loadingWorkspace') || 'Loading...'}</span>
+                  </div>
+                </div>
+              </div>
+            ) : viewMode === 'chat' ? (
+              <div
+                key="chat"
+                className="flex-1 flex flex-col h-full overflow-hidden"
+              >
+                <ChatWorkspace
+                  messages={currentSession.messages}
+                  onSendMessage={handleSendMessage}
+                  isProcessing={isProcessing}
+                  onDeleteMessage={handleDeleteMessage}
+                  onRegenerateMessage={handleRegenerateMessage}
+                  latestImage={latestImage}
+                  statusMessage={statusMessage}
+                />
+              </div>
+            ) : viewMode === 'settings' ? (
+              <div
+                key="settings"
+                className="flex-1 flex flex-col h-full overflow-hidden"
+              >
+                <SettingsWorkspace onNavigate={(sessionId) => {
+                  setCurrentSessionId(sessionId);
+                  setViewMode('chat');
+                }} />
+              </div>
+            ) : (
+              <div
+                key="canvas"
+                className="flex-1 flex flex-col h-full overflow-hidden"
+              >
+                <CanvasWorkspace
+                  messages={currentSession.messages}
+                  onSendMessage={handleSendMessage}
+                  onUpdateNodePosition={handleUpdateNodePosition}
+                  onAutoLayout={handleAutoLayout}
+                  isProcessing={isProcessing}
+                  onDeleteMessage={handleDeleteMessage}
+                  onRegenerateMessage={handleRegenerateMessage}
+                  statusMessage={statusMessage}
+                />
+              </div>
+            )}
+          </>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

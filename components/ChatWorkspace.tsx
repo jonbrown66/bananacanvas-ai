@@ -1,9 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import Image from 'next/image';
 import { Icons } from './Icons';
 import { Message, PromptSuggestion } from '../types';
-import ReactMarkdown from 'react-markdown';
+import { ChatMessageBubble } from './workspace/ChatMessageBubble';
+import { Check } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ChatWorkspaceProps {
   messages: Message[];
@@ -52,18 +63,16 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio>("Auto");
-  const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ratioMenuRef = useRef<HTMLDivElement>(null);
 
-  // When messages change (new one added), scroll to bottom
+  // When messages change (new one added) or processing starts, scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isProcessing]);
 
   // When latestImage changes (new generation), automatically select it
   useEffect(() => {
@@ -75,19 +84,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       }
     }
   }, [messages.length, latestImage]);
-
-  // Close ratio menu on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (ratioMenuRef.current && !ratioMenuRef.current.contains(event.target as Node)) {
-        setShowRatioMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   const getBestAspectRatio = (): "1:1" | "3:4" | "4:3" | "16:9" | "9:16" => {
     if (selectedRatio !== "Auto") return selectedRatio;
@@ -163,10 +159,29 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     document.body.removeChild(link);
   };
 
+  const handleImageClick = React.useCallback((id: string) => {
+    setActiveMessageId(id);
+  }, []);
+
+  const handleDownloadMessageImage = React.useCallback((e: React.MouseEvent, url: string) => {
+    e.stopPropagation();
+    downloadImage(url);
+  }, []);
+
+  const handleRegenerateClick = React.useCallback((e: React.MouseEvent, msg: Message) => {
+    e.stopPropagation();
+    onRegenerateMessage(msg);
+  }, [onRegenerateMessage]);
+
+  const handleDeleteClick = React.useCallback((e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    onDeleteMessage(id);
+  }, [onDeleteMessage]);
+
   return (
-    <div className="flex flex-1 h-full overflow-hidden bg-muted/30">
-      {/* Left: Conversation Area - 50% Width */}
-      <div className="w-1/2 flex flex-col border-r border-border bg-background h-full relative z-10">
+    <div className="flex flex-col lg:flex-row flex-1 h-full overflow-hidden bg-muted/30">
+      {/* Left: Conversation Area - 50% Width on desktop, 100% on mobile */}
+      <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-full lg:h-full relative z-10">
 
         {/* Messages List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
@@ -180,75 +195,17 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           )}
 
           {messages.map((msg) => (
-            <div key={msg.id} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'model' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex-shrink-0 flex items-center justify-center text-white font-bold text-xs">
-                  AI
-                </div>
-              )}
-
-              <div className={`max-w-[85%] space-y-2`}>
-                {(!msg.imageUrl || msg.role === 'user') && (
-                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.role === 'user'
-                    ? 'bg-muted text-foreground rounded-tr-sm'
-                    : 'bg-card border border-border text-card-foreground rounded-tl-sm'
-                    }`}>
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
-                  </div>
-                )}
-
-                {msg.imageUrl && (
-                  <div className="flex items-start gap-3 group">
-                    {/* Image Container */}
-                    <div
-                      className={`relative rounded-xl overflow-hidden border shadow-sm max-w-[140px] transition-all cursor-pointer ${activeMessageId === msg.id ? 'ring-2 ring-primary border-primary' : 'border-border hover:border-primary/50'
-                        }`}
-                      onClick={() => setActiveMessageId(msg.id)}
-                    >
-                      <Image
-                        src={msg.imageUrl}
-                        alt="Generated"
-                        width={0}
-                        height={0}
-                        sizes="100vw"
-                        className="w-full h-auto"
-                      />
-                    </div>
-
-                    {/* Side Actions (Fade In) */}
-                    <div className="flex flex-col gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); downloadImage(msg.imageUrl!); }}
-                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-foreground shadow-sm transition-all"
-                        title={t('download')}
-                      >
-                        <Icons.Download size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onRegenerateMessage(msg); }}
-                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-blue-600 shadow-sm transition-all"
-                        title={t('regenerate')}
-                      >
-                        <Icons.Regenerate size={14} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onDeleteMessage(msg.id); }}
-                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-destructive shadow-sm transition-all"
-                        title={t('delete')}
-                      >
-                        <Icons.Trash size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground font-bold text-xs">
-                  U
-                </div>
-              )}
-            </div>
+            <ChatMessageBubble
+              key={msg.id}
+              msg={msg}
+              isActive={activeMessageId === msg.id}
+              t={t}
+              isChinese={isChinese}
+              onImageClick={handleImageClick}
+              onDownload={handleDownloadMessageImage}
+              onRegenerate={handleRegenerateClick}
+              onDelete={handleDeleteClick}
+            />
           ))}
           {isProcessing && (
             <div className="flex gap-4">
@@ -277,7 +234,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           {uploadedImage && (
             <div className="absolute bottom-full left-4 mb-2 p-2 bg-popover rounded-lg border border-border shadow-lg flex items-center gap-2">
               <div className="w-12 h-12 rounded bg-muted overflow-hidden">
-                <Image src={uploadedImage} alt="Upload" fill className="object-cover" />
+                <img src={uploadedImage} alt="Upload" className="w-full h-full object-cover" decoding="async" />
               </div>
               <button onClick={clearUpload} className="p-1 hover:bg-muted rounded-full text-muted-foreground">
                 <Icons.SidebarClose size={14} className="rotate-45" />
@@ -296,46 +253,56 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
             {/* Left Tools */}
             <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={triggerFileUpload}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                title={t('uploadImage')}
-              >
-                <Icons.New size={20} />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={triggerFileUpload}
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                  >
+                    <Icons.New size={20} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {t('uploadImage')}
+                </TooltipContent>
+              </Tooltip>
 
               {/* Ratio Dropdown */}
-              <div className="relative" ref={ratioMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowRatioMenu(!showRatioMenu)}
-                  className="flex items-center gap-1 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                  title={t('aspectRatio')}
-                >
-                  {ASPECT_RATIOS.find(r => r.value === selectedRatio)?.icon}
-                  <span className="text-xs font-medium w-8 truncate">{selectedRatio === 'Auto' ? t('ratioAuto') : selectedRatio}</span>
-                </button>
-
-                {showRatioMenu && (
-                  <div className="absolute bottom-full left-0 mb-2 w-40 bg-popover border border-border shadow-lg rounded-xl overflow-hidden py-1 z-50">
-                    {ASPECT_RATIOS.map(ratio => (
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
                       <button
-                        key={ratio.value}
                         type="button"
-                        onClick={() => {
-                          setSelectedRatio(ratio.value);
-                          setShowRatioMenu(false);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-left ${selectedRatio === ratio.value ? 'text-primary bg-primary/10' : 'text-foreground'}`}
+                        className="flex items-center gap-1 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                       >
-                        {ratio.icon}
-                        {ratio.label}
+                        {ASPECT_RATIOS.find(r => r.value === selectedRatio)?.icon}
+                        <span className="text-xs font-medium w-8 truncate">{selectedRatio === 'Auto' ? t('ratioAuto') : selectedRatio}</span>
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {t('aspectRatio')}
+                  </TooltipContent>
+                </Tooltip>
+
+                <DropdownMenuContent align="start" sideOffset={8} className="w-40 bg-popover/95 backdrop-blur-md shadow-xl rounded-xl p-1.5 border border-border/50">
+                  {ASPECT_RATIOS.map(ratio => (
+                    <DropdownMenuItem
+                      key={ratio.value}
+                      className={`flex items-center gap-2 cursor-pointer rounded-md ${selectedRatio === ratio.value ? 'text-primary focus:text-primary bg-primary/10 focus:bg-primary/20 font-medium' : ''}`}
+                      onClick={() => setSelectedRatio(ratio.value)}
+                    >
+                      <span className="flex items-center gap-2 flex-1">
+                        {ratio.icon}
+                        <span>{ratio.label}</span>
+                      </span>
+                      {selectedRatio === ratio.value && <Check size={14} className="ml-2" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
 
@@ -358,22 +325,30 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       </div>
 
-      {/* Right: Preview & Tools - 50% Width */}
-      <div className="w-1/2 bg-muted/30 flex flex-col h-full">
+      {/* Right: Preview & Tools - 50% Width on desktop, 100% on mobile */}
+      <div className="w-full lg:w-1/2 bg-muted/30 flex flex-col h-1/2 lg:h-full">
         {/* Top: Image Preview */}
         <div className="flex-1 p-6 flex flex-col overflow-hidden">
-          <h3 className={`text-foreground font-medium mb-4 flex items-center gap-2 flex-shrink-0 ${isChinese ? '' : 'font-serif'}`}>
+          <h3 className="text-foreground font-medium mb-4 flex items-center gap-2 flex-shrink-0">
             <Icons.Image size={18} />
             {t('workspacePreview')} {activeMessageId ? `(${t('selected')})` : `(${t('latest')})`}
           </h3>
           {/* We ref this container to determine aspects */}
-          <div ref={previewRef} className="flex-1 bg-muted/50 rounded-2xl border-2 border-dashed border-border flex items-center justify-center overflow-hidden relative group">
+          <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden relative group p-4">
             {activeImage ? (
-              <Image src={activeImage} alt="Active workspace" fill className="object-contain shadow-lg" />
+              <div className="relative w-full h-full max-w-[90%] max-h-[90%] flex items-center justify-center">
+                {/* 使用 img 标签配合 max-w / max-h 可以让容器紧抱住图片真实渲染尺寸 */}
+                <img
+                  src={activeImage}
+                  alt="Active workspace"
+                  className="max-w-full max-h-full rounded-xl shadow-md border border-border object-contain transition-transform duration-300 hover:scale-[1.01]"
+                  decoding="async"
+                />
+              </div>
             ) : (
-              <div className="text-center text-muted-foreground">
-                <Icons.Image size={48} className="mx-auto mb-2 opacity-50" />
-                <span className="text-sm">{t('noImageSelected')}</span>
+              <div className="w-full h-full max-w-[90%] max-h-[90%] bg-muted/30 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-center text-muted-foreground transition-all">
+                <Icons.Image size={44} className="mx-auto mb-3 opacity-40" />
+                <span className="text-xs">{t('noImageSelected')}</span>
               </div>
             )}
           </div>
@@ -381,7 +356,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
         {/* Bottom: Quick Prompts */}
         <div className="h-auto flex-shrink-0 border-t border-border p-6 bg-card">
-          <h3 className={`text-foreground font-medium mb-4 flex items-center gap-2 ${isChinese ? '' : 'font-serif'}`}>
+          <h3 className="text-foreground font-medium mb-4 flex items-center gap-2">
             <Icons.Magic size={18} />
             {t('quickActions')}
           </h3>
