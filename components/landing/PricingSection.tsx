@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Zap, Check } from 'lucide-react';
+import { Zap, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useTranslations } from 'next-intl';
@@ -16,6 +16,7 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
     const router = useRouter();
     const { session } = useSupabase();
     const [pricingMode, setPricingMode] = useState<'monthly' | 'yearly' | 'credits'>('monthly');
+    const [loadingProductId, setLoadingProductId] = useState<string | null>(null);
 
     const handlePurchase = async (productId: string) => {
         if (!session?.user?.id) {
@@ -23,7 +24,11 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
             return;
         }
 
+        if (loadingProductId) return;
+
         try {
+            setLoadingProductId(productId);
+
             const redirectUrl = encodeURIComponent(window.location.origin + '/app/settings/billing/success');
             const response = await fetch(`/api/payments/checkout?productId=${productId}&redirectUrl=${redirectUrl}`);
             const data = await response.json();
@@ -32,10 +37,12 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
             } else {
                 console.error("No redirect URL returned", data);
                 notify("Something went wrong. Please try again.");
+                setLoadingProductId(null);
             }
         } catch (error) {
             console.error("Checkout error:", error);
             notify("Failed to initiate checkout.");
+            setLoadingProductId(null);
         }
     };
 
@@ -157,24 +164,24 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
         <section id="pricing" className="py-24 px-6 bg-background border-t border-border">
             <div className="max-w-7xl mx-auto">
                 {/* Toggle */}
-                <div className="flex justify-center mb-16">
-                    <div className="bg-muted p-1 rounded-full border border-border inline-flex relative">
+                <div className="flex justify-center mb-16 relative z-20">
+                    <div className="bg-muted/30 p-1.5 rounded-full border border-border inline-flex relative">
                         <button
                             onClick={() => setPricingMode('monthly')}
-                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${pricingMode === 'monthly' ? 'bg-card text-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             {t('monthly')}
                         </button>
                         <button
                             onClick={() => setPricingMode('yearly')}
-                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${pricingMode === 'yearly' ? 'bg-card text-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             {t('yearly')}
                         </button>
-                        <div className="w-px h-4 bg-border my-auto mx-1"></div>
+                        <div className="w-px h-6 bg-border/50 my-auto mx-2"></div>
                         <button
                             onClick={() => setPricingMode('credits')}
-                            className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${pricingMode === 'credits' ? 'bg-card text-foreground shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'credits' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             {t('credits')}
                         </button>
@@ -189,26 +196,36 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                         </div>
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {creditPackages.map((pkg, index) => (
-                                <div key={index} className={`bg-card rounded-3xl p-6 border border-border flex flex-col ${pkg.highlight ? 'border-2 border-foreground shadow-[0_0_40px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_rgba(255,255,255,0.3)] transform scale-105 z-10 relative' : ''}`}>
+                                <div
+                                    key={index}
+                                    className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${pkg.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10' : 'border border-border hover:border-border/80 hover:shadow-lg hover:-translate-y-1'} flex flex-col`}
+                                >
                                     {pkg.highlight && (
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-foreground text-background px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white px-3 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase">
                                             {t('popular')}
                                         </div>
                                     )}
-                                    <div className={`flex items-center justify-between mb-8 ${pkg.highlight ? 'mt-2' : ''}`}>
-                                        <div className="flex items-center gap-2 text-foreground font-bold text-xl">
-                                            <Zap size={20} className="text-muted-foreground" /> {pkg.credits}
+                                    <div className={`flex items-center justify-between xl:flex-row flex-col xl:items-end items-start gap-4 mb-8 relative z-10 ${pkg.highlight ? 'mt-2' : ''}`}>
+                                        <div className="flex items-center gap-2 text-foreground font-semibold text-xl">
+                                            <Zap size={20} className={pkg.highlight ? "text-brand" : "text-muted-foreground"} /> {pkg.credits}
                                         </div>
-                                        <div className="text-brand-DEFAULT font-bold text-2xl">{pkg.price}</div>
+                                        <div className="text-foreground tracking-tight font-bold text-3xl">{pkg.price}</div>
                                     </div>
-                                    <p className="text-muted-foreground text-sm mb-8 flex-1">
+                                    <p className="text-muted-foreground text-sm mb-8 flex-1 leading-relaxed relative z-10">
                                         {pkg.desc}
                                     </p>
                                     <button
                                         onClick={() => handlePurchase(pkg.productId)}
-                                        className={`w-full py-3 px-6 rounded-xl bg-muted text-foreground font-bold hover:bg-muted/80 transition-colors ${pkg.highlight ? 'shadow-lg shadow-foreground/5 dark:shadow-white/10' : ''}`}
+                                        disabled={loadingProductId === pkg.productId}
+                                        className={`w-full py-3 px-6 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all relative z-10 ${pkg.highlight ? 'bg-brand text-white shadow-sm hover:opacity-90 active:scale-95' : 'bg-muted text-foreground hover:bg-muted/80 active:scale-95'} disabled:opacity-70 disabled:cursor-not-allowed`}
                                     >
-                                        {t('purchase')}
+                                        {loadingProductId === pkg.productId ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" /> {t('purchase')}
+                                            </>
+                                        ) : (
+                                            t('purchase')
+                                        )}
                                     </button>
                                 </div>
                             ))}
@@ -217,35 +234,47 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                 ) : (
                     <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
                         {subscriptionPlans.map((planItem, index) => (
-                            <div key={index} className={`bg-card rounded-3xl p-8 border border-border flex flex-col ${planItem.highlight ? 'border-2 border-foreground shadow-[0_0_40px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_rgba(255,255,255,0.3)] transform scale-105 z-10 relative' : ''}`}>
+                            <div
+                                key={index}
+
+                                className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${planItem.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10 flex flex-col' : 'border border-border hover:border-border/80 hover:-translate-y-1 hover:shadow-lg flex flex-col'}`}
+                            >
                                 {planItem.highlight && (
-                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-1 rounded-full text-xs font-bold shadow-lg">
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white px-3 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase">
                                         {t('popular')}
                                     </div>
                                 )}
-                                <h3 className="text-lg font-medium text-foreground mb-4">{planItem.name}</h3>
-                                <div className="flex items-baseline gap-1 mb-2">
-                                    <span className="text-5xl font-bold text-foreground tracking-tight">{planItem.price}</span>
-                                    {planItem.period && <span className="text-lg text-muted-foreground font-medium">{planItem.period}</span>}
+                                <h3 className={`text-lg font-semibold relative z-10 mb-4 ${planItem.highlight ? 'text-brand' : 'text-foreground'}`}>{planItem.name}</h3>
+                                <div className="flex items-baseline gap-1 mb-2 relative z-10">
+                                    <span className="text-4xl font-bold text-foreground tracking-tight">{planItem.price}</span>
+                                    {planItem.period && <span className="text-sm text-muted-foreground font-medium">{planItem.period}</span>}
                                 </div>
-                                <p className="text-muted-foreground text-sm mb-8">{planItem.desc}</p>
+                                <p className="text-muted-foreground text-sm mb-8 leading-relaxed relative z-10">{planItem.desc}</p>
 
                                 <button
                                     onClick={planItem.action}
-                                    className={`w-full py-3 px-6 rounded-xl bg-muted text-foreground font-bold hover:bg-muted/80 transition-colors mb-8 ${planItem.highlight ? 'shadow-lg shadow-foreground/5 dark:shadow-white/10' : ''}`}
+                                    disabled={loadingProductId !== null}
+                                    className={`w-full py-3 px-6 flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all relative z-10 mb-8 ${planItem.highlight ? 'bg-brand text-white shadow-sm hover:opacity-90 active:scale-95' : 'bg-muted text-foreground hover:bg-muted/80 active:scale-95'} disabled:opacity-70 disabled:cursor-not-allowed`}
                                 >
-                                    {planItem.buttonText}
+                                    {(planItem.name === t('pro') && loadingProductId === process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_PRO) ||
+                                        (planItem.name === t('business') && loadingProductId === process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_BUSINESS) ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" /> {planItem.buttonText}
+                                        </>
+                                    ) : (
+                                        planItem.buttonText
+                                    )}
                                 </button>
 
-                                <div className="border-t border-dashed border-border mb-8"></div>
+                                <div className="border-t border-border/50 mb-8 w-full relative z-10"></div>
 
-                                <ul className="space-y-4 flex-1">
+                                <ul className="space-y-4 flex-1 relative z-10">
                                     {planItem.features.map((feature, fIndex) => (
-                                        <li key={fIndex} className="flex items-center gap-3 text-sm text-muted-foreground">
-                                            <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                                                <Check size={12} className="text-green-500" />
+                                        <li key={fIndex} className="flex items-start gap-3 text-sm text-foreground/80">
+                                            <div className="mt-0.5">
+                                                <Check size={16} strokeWidth={3} className={planItem.highlight ? "text-brand" : "text-muted-foreground"} />
                                             </div>
-                                            {feature}
+                                            <span className="leading-relaxed">{feature}</span>
                                         </li>
                                     ))}
                                 </ul>

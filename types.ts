@@ -8,6 +8,7 @@ export interface Message {
   // Canvas specific properties
   parentId?: string;
   position?: { x: number; y: number };
+  isPlaceholder?: boolean;
 }
 
 export interface Session {
@@ -15,6 +16,7 @@ export interface Session {
   title: string;
   messages: Message[];
   lastModified: number;
+  isLoaded?: boolean;
 }
 
 export type ViewMode = 'chat' | 'canvas' | 'settings';

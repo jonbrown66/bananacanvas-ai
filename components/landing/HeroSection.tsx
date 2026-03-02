@@ -12,11 +12,11 @@ export const HeroSection = () => {
             {/* Hero Section */}
             <section id="hero" className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 relative overflow-hidden">
                 <div className="max-w-5xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted border border-border text-brand-secondary text-xs font-medium mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <Sparkles size={12} />
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted border border-border text-brand-secondary text-xs font-medium mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-[0_0_15px_-3px_rgba(249,115,22,0.15)] dark:shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)]">
+                        <Sparkles size={12} className="text-brand" />
                         <span>{t('newFeature')}</span>
                     </div>
-                    <h1 className="font-serif text-6xl md:text-8xl leading-[1.1] font-medium text-foreground mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                    <h1 className="text-6xl md:text-8xl leading-[1.1] font-medium text-foreground mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
                         {t('heroTitle')}
                     </h1>
                     <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
@@ -25,20 +25,19 @@ export const HeroSection = () => {
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
                         <Link
                             href="/app"
-                            className="group relative w-full sm:w-auto px-10 py-5 bg-foreground text-background rounded-full font-bold text-lg transition-all hover:-translate-y-0.5 hover:shadow-lg overflow-hidden"
+                            className="group relative w-full sm:w-auto px-10 py-4 bg-foreground text-background rounded-full font-semibold text-lg transition-all hover:-translate-y-1 hover:bg-foreground/90 hover:shadow-lg active:scale-95 overflow-hidden flex items-center justify-center gap-2"
                         >
                             <span className="relative z-10 flex items-center justify-center gap-2">
                                 {t('startCreating')} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                             </span>
-                            <div className="absolute inset-0 bg-gradient-to-r from-gray-100 to-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                         </Link>
                     </div>
                 </div>
 
                 {/* Abstract Background Elements */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl -z-10 pointer-events-none">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-DEFAULT/20 rounded-full blur-[128px] opacity-50"></div>
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[128px] opacity-30"></div>
+                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/10 rounded-full blur-[128px] opacity-30 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
+                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-foreground/5 rounded-full blur-[128px] opacity-20 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
                 </div>
             </section>
 

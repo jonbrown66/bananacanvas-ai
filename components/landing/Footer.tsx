@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Twitter, Github, Linkedin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
@@ -10,9 +11,11 @@ export const Footer = () => {
             <div className="max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                     <div className="col-span-1 md:col-span-2">
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="w-8 h-8 bg-brand-DEFAULT rounded-lg"></div>
-                            <span className="font-serif text-xl font-bold text-foreground">BananaCanvas</span>
+                        <div className="flex items-center gap-2 mb-6 cursor-pointer group">
+                            <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Image src="/logo.png" alt="Logo" width={32} height={32} className="w-full h-full object-contain" />
+                            </div>
+                            <span className="text-xl font-medium tracking-tight text-foreground">BananaCanvas</span>
                         </div>
                         <p className="text-muted-foreground max-w-sm">
                             {t('tagline')}

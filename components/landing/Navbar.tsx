@@ -26,13 +26,13 @@ export const Navbar = () => {
                     <div className="w-8 h-8 flex items-center justify-center group-hover:scale-105 transition-transform">
                         <Image src="/logo.png" alt="Logo" width={32} height={32} className="w-full h-full object-contain" />
                     </div>
-                    <span className="font-serif text-xl font-medium tracking-tight text-foreground">BananaCanvas</span>
+                    <span className="text-xl font-medium tracking-tight text-foreground">BananaCanvas</span>
                 </div>
 
                 <div className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-                    <button onClick={() => scrollTo('features')} className="hover:text-foreground transition-colors">{t('features')}</button>
-                    <button onClick={() => scrollTo('pricing')} className="hover:text-foreground transition-colors">{t('pricing')}</button>
-                    <button onClick={() => scrollTo('faq')} className="hover:text-foreground transition-colors">{t('faq')}</button>
+                    <button onClick={() => scrollTo('features')} className="hover-underline-anim hover:text-foreground transition-colors pb-1">{t('features')}</button>
+                    <button onClick={() => scrollTo('pricing')} className="hover-underline-anim hover:text-foreground transition-colors pb-1">{t('pricing')}</button>
+                    <button onClick={() => scrollTo('faq')} className="hover-underline-anim hover:text-foreground transition-colors pb-1">{t('faq')}</button>
                     <div className="flex items-center gap-2">
                         <LanguageSwitcher />
                         <LandingThemeToggle />
@@ -40,7 +40,7 @@ export const Navbar = () => {
                     <div className="h-4 w-px bg-border mx-2"></div>
                     <Link
                         href="/login"
-                        className="bg-foreground text-background px-6 py-2.5 rounded-full hover:bg-muted-foreground/20 hover:text-foreground transition-all font-bold text-sm shadow-[0_0_20px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]"
+                        className="bg-foreground text-background px-6 py-2 rounded-full font-medium text-sm transition-all hover:bg-foreground/90 active:scale-95"
                     >
                         {t('getStarted')}
                     </Link>
@@ -67,7 +67,7 @@ export const Navbar = () => {
                     </div>
                     <Link
                         href="/login"
-                        className="bg-foreground text-background py-3 rounded-xl text-center font-bold mt-2"
+                        className="bg-foreground text-background py-3 rounded-xl text-center font-medium mt-2 active:scale-95 transition-transform"
                     >
                         {t('getStarted')}
                     </Link>
