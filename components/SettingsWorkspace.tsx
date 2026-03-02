@@ -26,6 +26,23 @@ export function SettingsWorkspace({ onNavigate }: { onNavigate?: (sessionId: str
 
     useEffect(() => {
         loadProfileData();
+
+        // 1. Check URL parameters for initial mount
+        const searchParams = new URLSearchParams(window.location.search);
+        const tab = searchParams.get('tab');
+        if (tab === 'billing' || tab === 'profile' || tab === 'security') {
+            setActiveTab(tab as typeof activeTab);
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+
+        // 2. Listen to custom event for dynamic switching while already mounted
+        const handleOpenTab = (e: Event) => {
+            const customEvent = e as CustomEvent<"profile" | "security" | "billing">;
+            setActiveTab(customEvent.detail);
+        };
+        window.addEventListener('open-settings-tab', handleOpenTab);
+
+        return () => window.removeEventListener('open-settings-tab', handleOpenTab);
     }, [session, supabase]);
 
     const loadProfileData = async () => {

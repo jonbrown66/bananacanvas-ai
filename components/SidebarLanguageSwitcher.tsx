@@ -11,7 +11,10 @@ export function SidebarLanguageSwitcher() {
     const pathname = usePathname();
 
     const handleSwitch = (newLocale: string) => {
-        router.replace(pathname, { locale: newLocale });
+        const currentPath = window.location.pathname;
+        const newPath = currentPath.replace(/^\/(en|zh-CN)/, `/${newLocale}`);
+        const currentSearch = window.location.search;
+        window.location.href = `${newPath}${currentSearch}`;
     };
 
     return (

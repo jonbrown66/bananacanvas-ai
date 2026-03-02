@@ -11,7 +11,7 @@ interface SupabaseProviderProps {
 }
 
 interface SupabaseContextValue {
-  supabase: SupabaseClient<Database>;
+  supabase: any;
   session: Session | null;
 }
 

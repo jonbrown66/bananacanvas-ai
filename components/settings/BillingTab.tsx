@@ -36,8 +36,8 @@ export function BillingTab({ billingProfile, onNavigate }: BillingTabProps) {
         setError(null);
 
         try {
-            const response = await fetch(`/api/payments/checkout?productId=${productId}&redirectUrl=${encodeURIComponent(window.location.origin + '/app/settings/billing/success')}`, {
-                method: 'GET',
+            const response = await fetch(`/api/payments/checkout?productId=${productId}&redirectUrl=${encodeURIComponent(window.location.origin + '/app?view=settings&tab=billing')}`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
