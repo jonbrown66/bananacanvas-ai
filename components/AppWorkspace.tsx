@@ -167,27 +167,82 @@ export default function App({
     setSessions((prev) => prev.map((s) => (s.id === projectId ? { ...s, lastModified: Date.now() } : s)));
   };
 
-  // Fetch User Profile (Credits & Avatar)
+  // Initialization: Fetch User Profile and Projects in Parallel
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!userId) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('credits, plan, avatar_url, display_name')
-        .eq('id', userId)
-        .single();
+    const initWorkspace = async () => {
+      if (!userId) {
+        console.warn("Init skipped: No userId available.");
+        setAppLoading(false);
+        return;
+      }
 
-      if (!error && data) {
-        const profile = data as Pick<ProfileRow, "credits" | "avatar_url" | "display_name">;
-        setUserProfile((prev: UserProfile) => ({
-          ...prev,
-          credits: profile.credits ?? 0,
-          avatarUrl: profile.avatar_url || prev.avatarUrl,
-          name: profile.display_name || prev.name
+      setAppLoading(true);
+
+      try {
+        // Parallel fetch for profile and projects
+        const [profileRes, projectsRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('credits, plan, avatar_url, display_name')
+            .eq('id', userId)
+            .single(),
+          supabase
+            .from('projects')
+            .select('*')
+            .order('last_modified', { ascending: false })
+        ]);
+
+        // Handle Profile Data
+        if (!profileRes.error && profileRes.data) {
+          const profile = profileRes.data as Pick<ProfileRow, "credits" | "avatar_url" | "display_name">;
+          setUserProfile((prev: UserProfile) => ({
+            ...prev,
+            credits: profile.credits ?? 0,
+            avatarUrl: profile.avatar_url || prev.avatarUrl,
+            name: profile.display_name || prev.name
+          }));
+        }
+
+        // Handle Projects Data
+        if (projectsRes.error) throw projectsRes.error;
+
+        if (!projectsRes.data || projectsRes.data.length === 0) {
+          await createNewSession();
+          setAppLoading(false);
+          return;
+        }
+
+        const projects = projectsRes.data as ProjectRow[];
+        const normalized = projects.map((p) => ({
+          id: p.id,
+          title: p.title,
+          lastModified: p.last_modified ? new Date(p.last_modified).getTime() : Date.now(),
+          messages: [],
+          isLoaded: false
         }));
+        setSessions(normalized);
+
+        // Determine starting session
+        let startId = projects[0].id;
+        if (initialSessionId) {
+          const found = projects.find(p => p.id === initialSessionId);
+          if (found) startId = found.id;
+        }
+
+        setCurrentSessionId(startId);
+
+        // Optimization: Start loading messages for the initial session immediately
+        // without waiting for the next render cycle of currentSessionId
+        loadMessagesForProject(startId);
+
+      } catch (err) {
+        console.error("Workspace initialization failed:", err);
+      } finally {
+        setAppLoading(false);
       }
     };
-    fetchProfile();
+
+    initWorkspace();
 
     // Subscribe to profile changes
     const channel = supabase
@@ -216,57 +271,6 @@ export default function App({
       supabase.removeChannel(channel);
     };
   }, [userId, supabase]);
-
-  useEffect(() => {
-    const bootstrap = async () => {
-      if (!userId) return;
-      setAppLoading(true);
-
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('last_modified', { ascending: false });
-
-      if (error) {
-        console.error("Failed to load projects", error);
-        setAppLoading(false);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        await createNewSession();
-        setAppLoading(false);
-        return;
-      }
-
-      const projects = data as ProjectRow[];
-
-      const normalized = projects.map((p) => ({
-        id: p.id,
-        title: p.title,
-        lastModified: p.last_modified ? new Date(p.last_modified).getTime() : Date.now(),
-        messages: [],
-        isLoaded: false
-      }));
-      setSessions(normalized);
-
-      // Determine starting session
-      let startId = projects[0].id;
-      if (initialSessionId) {
-        const found = projects.find(p => p.id === initialSessionId);
-        if (found) {
-          startId = found.id;
-        }
-      }
-
-      // let the subsequent useEffect catch the !isLoaded state
-      // and do the heavy data loading without blocking the UI
-      setCurrentSessionId(startId);
-      setAppLoading(false);
-    };
-
-    bootstrap();
-  }, [supabase, userId]);
 
   useEffect(() => {
     if (!currentSessionId) return;
