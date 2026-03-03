@@ -4,15 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { useSupabase } from "@/components/providers/supabase-provider";
 import type { Database } from "@/lib/types";
 
+import dynamic from 'next/dynamic';
 import { Notification } from "@/components/ui/notification";
 import { Navbar } from "@/components/landing/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { FeaturesSection } from "@/components/landing/FeaturesSection";
-import { GallerySection } from "@/components/landing/GallerySection";
-import { PricingSection } from "@/components/landing/PricingSection";
-import { FAQSection } from "@/components/landing/FAQSection";
-import { Footer } from "@/components/landing/Footer";
 import { Loader2 } from "lucide-react";
+
+// Lazy load below-the-fold components
+const FeaturesSection = dynamic(() => import("@/components/landing/FeaturesSection").then(mod => mod.FeaturesSection));
+const GallerySection = dynamic(() => import("@/components/landing/GallerySection").then(mod => mod.GallerySection));
+const PricingSection = dynamic(() => import("@/components/landing/PricingSection").then(mod => mod.PricingSection));
+const FAQSection = dynamic(() => import("@/components/landing/FAQSection").then(mod => mod.FAQSection));
+const Footer = dynamic(() => import("@/components/landing/Footer").then(mod => mod.Footer));
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 

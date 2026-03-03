@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Sidebar } from './Sidebar';
@@ -18,7 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from '../lib/store';
 
 type MessageRow = Database['public']['Tables']['messages']['Row'];
@@ -62,11 +62,12 @@ export default function App({
   const t = useTranslations('Workspace');
 
   // Connect to global Zustand Store
+  // Connect to global Zustand Store with useShallow for array/object properties
   const sidebarOpen = useWorkspaceStore(s => s.sidebarOpen);
   const setSidebarOpen = useWorkspaceStore(s => s.setSidebarOpen);
-  const userProfile = useWorkspaceStore(s => s.userProfile);
+  const userProfile = useWorkspaceStore(useShallow(s => s.userProfile));
   const setUserProfile = useWorkspaceStore(s => s.setUserProfile);
-  const sessions = useWorkspaceStore(s => s.sessions);
+  const sessions = useWorkspaceStore(useShallow(s => s.sessions));
   const setSessions = useWorkspaceStore(s => s.setSessions);
   const currentSessionId = useWorkspaceStore(s => s.currentSessionId);
   const setCurrentSessionId = useWorkspaceStore(s => s.setCurrentSessionId);

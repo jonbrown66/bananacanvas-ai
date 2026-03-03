@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from 'next-intl';
 import Image from "next/image";
@@ -45,7 +45,7 @@ interface SidebarProps {
 
 // ... (imports)
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar = memo(({
   isOpen,
   viewMode,
   setViewMode,
@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   logoutLoading,
   onToggle,
   onPrefetchSession
-}) => {
+}: SidebarProps) => {
   const router = useRouter();
   const t = useTranslations('Workspace');
   const locale = useLocale();
@@ -494,4 +494,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </div>
   );
-};
+});

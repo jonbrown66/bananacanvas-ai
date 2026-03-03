@@ -64,6 +64,8 @@ export const HeroSection = () => {
                                 height={1080}
                                 className="w-full h-auto object-cover block dark:hidden"
                                 priority
+                                quality={85}
+                                sizes="(max-width: 1280px) 100vw, 1280px"
                             />
                             <Image
                                 src="/hero-image-black.png"
@@ -72,6 +74,8 @@ export const HeroSection = () => {
                                 height={1080}
                                 className="w-full h-auto object-cover hidden dark:block"
                                 priority
+                                quality={85}
+                                sizes="(max-width: 1280px) 100vw, 1280px"
                             />
                         </div>
                     </div>

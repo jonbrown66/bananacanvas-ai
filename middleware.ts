@@ -6,10 +6,18 @@ import { updateSession } from './lib/supabase-middleware';
 const handleI18n = createMiddleware(routing);
 
 export async function middleware(req: NextRequest) {
-  const { response, user } = await updateSession(req);
+  const { response: supabaseResponse, user } = await updateSession(req);
 
   // Apply i18n
   const res = handleI18n(req);
+
+  const pathname = req.nextUrl.pathname;
+  console.log(`[Middleware] Path: ${pathname}, User: ${user ? 'Authenticated' : 'Guest'}`);
+
+  // Merge Supabase cookies into the i18n response
+  supabaseResponse.cookies.getAll().forEach(cookie => {
+    res.cookies.set(cookie.name, cookie.value, cookie);
+  });
 
   // If next-intl redirects, return immediately
   if (res.headers.get('Location')) {
@@ -17,19 +25,22 @@ export async function middleware(req: NextRequest) {
   }
 
   // Check authentication for /app routes
-  // We need to check both the raw path and the locale-prefixed path
-  const pathname = req.nextUrl.pathname;
-  const isAppRoute = pathname === '/app' ||
-    pathname.startsWith('/app/') ||
-    pathname.match(/^\/(en|zh-CN)\/app($|\/)/);
+  // segments.includes('app') is a simple way to check if this is an app-related route
+  const segments = pathname.split('/');
+  const isAppRoute = segments.includes('app');
 
   if (isAppRoute && !user) {
+    console.log(`[Middleware] Auth required for ${pathname}. Redirecting to login.`);
     // Redirect to login if accessing app route while unauthenticated
-    // Get the locale to redirect to the correct login page
-    const locale = pathname.match(/^\/(zh-CN|en)\//)?.[1] || 'en';
+    const locale = segments.find(s => s === 'en' || s === 'zh-CN') || 'en';
     const url = req.nextUrl.clone();
     url.pathname = `/${locale}/login`;
-    return NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url);
+    // Also copy cookies to the redirect response
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectRes.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectRes;
   }
 
   return res;
