@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "check:pm": "node scripts/check-package-manager.cjs",
-    "dev": "node scripts/run-next.cjs dev",
-    "build": "node scripts/run-next.cjs build",
+    "dev": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('dev'));\"",
+    "build": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('build'));\"",
     "test:security": "node tests/security/route-guards.smoke.mjs",
-    "start": "node scripts/run-next.cjs start",
-    "lint": "node scripts/run-next.cjs lint",
-    "predev": "node scripts/ensure-next-cjs.cjs",
-    "prebuild": "node scripts/ensure-next-cjs.cjs",
-    "prestart": "node scripts/ensure-next-cjs.cjs"
+    "start": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('start'));\"",
+    "lint": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('lint'));\"",
+    "predev": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\"",
+    "prebuild": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\"",
+    "prestart": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\""
   },
   "dependencies": {
     "@creem_io/nextjs": "^0.4.0",

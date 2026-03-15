@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { Notification } from "@/components/ui/notification";
 import { Navbar } from "@/components/landing/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
+import { usePrefersReducedMotion } from "@/components/landing/usePrefersReducedMotion";
 
 // Lazy load below-the-fold components
 const FeaturesSection = dynamic(() => import("@/components/landing/FeaturesSection").then(mod => mod.FeaturesSection));
@@ -22,6 +23,7 @@ export const LandingPage = () => {
     const { supabase, session } = useSupabase();
     const [plan, setPlan] = useState<string>('free');
     const [notification, setNotification] = useState<{ message: string, show: boolean }>({ message: '', show: false });
+    const prefersReducedMotion = usePrefersReducedMotion();
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -45,12 +47,14 @@ export const LandingPage = () => {
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand-DEFAULT/30 selection:text-brand-light">
             <Navbar />
-            <HeroSection />
-            <FeaturesSection />
-            <GallerySection />
-            <PricingSection plan={plan} notify={showNotification} />
-            <FAQSection />
-            <Footer />
+            <main className={prefersReducedMotion ? "" : "motion-fade-in"}>
+                <HeroSection />
+                <FeaturesSection />
+                <GallerySection />
+                <PricingSection plan={plan} notify={showNotification} />
+                <FAQSection />
+                <Footer />
+            </main>
 
             <Notification
                 message={notification.message}
