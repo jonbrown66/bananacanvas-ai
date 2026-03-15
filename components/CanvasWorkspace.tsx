@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import ReactMarkdown from 'react-markdown';
+import { reportClientMetric } from '@/lib/perf/client-metrics';
 
 interface CanvasWorkspaceProps {
   messages: Message[];
@@ -17,7 +17,7 @@ interface CanvasWorkspaceProps {
   onUpdateNodePosition: (id: string, pos: { x: number, y: number }) => void | Promise<void>;
   onAutoLayout: (positions: Record<string, { x: number, y: number }>) => void | Promise<void>;
   isProcessing: boolean;
-  onDeleteMessage: (id: string) => void | Promise<void>;
+  onDeleteMessage: (id: string, anchor?: { x: number; y: number }) => void | Promise<void>;
   onRegenerateMessage: (msg: Message) => void;
   statusMessage?: string;
 }
@@ -39,13 +39,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
-  const [canvasDragStart, setCanvasDragStart] = useState({ x: 0, y: 0 });
 
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [nodeDragOffset, setNodeDragOffset] = useState({ x: 0, y: 0 });
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [promptInput, setPromptInput] = useState('');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [dragViewportTick, setDragViewportTick] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fastPosition = useRef({ x: 0, y: 0 });
+  const scaleRef = useRef(scale);
   const canvasClickStart = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingCanvasRef = useRef(false);
+  const draggingNodeIdRef = useRef<string | null>(null);
+  const canvasDragStartRef = useRef({ x: 0, y: 0 });
+  const nodeDragOffsetRef = useRef({ x: 0, y: 0 });
 
   // Store references to HTML elements directly, enabling 60fps fast translation updates without React re-renders.
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -81,6 +86,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   }, [position]);
 
   useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
     // When messages change, ensure fastNodePositions is synchronized.
     const positions: Record<string, { x: number, y: number }> = {};
     messages.forEach(m => {
@@ -95,6 +104,111 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   }, [messages, draggingNodeId]);
 
   const lastFocusedFirstMsgId = useRef<string | null>(null);
+  const isLargeScene = messages.length >= 140;
+  const shouldTrackDragViewport = isLargeScene && (isDraggingCanvas || !!draggingNodeId);
+
+  useEffect(() => {
+    if (!shouldTrackDragViewport) return;
+
+    let rafId: number | null = null;
+    let lastSampleAt = 0;
+
+    const loop = (now: number) => {
+      if (now - lastSampleAt >= 33) {
+        setDragViewportTick((tick) => (tick + 1) % 10_000);
+        lastSampleAt = now;
+      }
+      rafId = requestAnimationFrame(loop);
+    };
+
+    rafId = requestAnimationFrame(loop);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [shouldTrackDragViewport]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setContainerSize((prev) => {
+        const next = { width: Math.round(rect.width), height: Math.round(rect.height) };
+        if (next.width === prev.width && next.height === prev.height) return prev;
+        return next;
+      });
+    };
+
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+    let startAt = performance.now();
+    let lastTs = startAt;
+    let frames = 0;
+    let droppedFrames = 0;
+    const SAMPLE_WINDOW_MS = 5000;
+
+    const loop = (now: number) => {
+      if (document.hidden) {
+        lastTs = now;
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+
+      const delta = now - lastTs;
+      if (delta > 18) {
+        droppedFrames += Math.max(0, Math.round(delta / 16.67) - 1);
+      }
+
+      frames += 1;
+      if (now - startAt >= SAMPLE_WINDOW_MS) {
+        const duration = Math.max(now - startAt, 1);
+        const fps = (frames * 1000) / duration;
+        reportClientMetric({
+          name: 'canvas_fps',
+          value: Number(fps.toFixed(2)),
+          unit: 'fps',
+          tags: {
+            messages: messages.length,
+            dropped_frames: droppedFrames,
+            scale: Number(scaleRef.current.toFixed(2))
+          }
+        });
+
+        reportClientMetric({
+          name: 'canvas_dropped_frames',
+          value: droppedFrames,
+          unit: 'count',
+          tags: {
+            messages: messages.length
+          }
+        });
+
+        startAt = now;
+        frames = 0;
+        droppedFrames = 0;
+      }
+
+      lastTs = now;
+      rafId = requestAnimationFrame(loop);
+    };
+
+    rafId = requestAnimationFrame(loop);
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [messages.length]);
 
   // Initial focus: on first load or project switch, select the last node and pan the canvas to center it
   useEffect(() => {
@@ -170,6 +284,50 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return fastNodePositions.current[msg.id] || msg.position || { x: 0, y: 0 };
   };
 
+  const viewportBounds = React.useMemo(() => {
+    if (!containerSize.width || !containerSize.height) return null;
+    const activePosition = shouldTrackDragViewport ? fastPosition.current : position;
+    const activeScale = shouldTrackDragViewport ? scaleRef.current : scale;
+
+    return {
+      left: (-activePosition.x) / activeScale,
+      top: (-activePosition.y) / activeScale,
+      right: (containerSize.width - activePosition.x) / activeScale,
+      bottom: (containerSize.height - activePosition.y) / activeScale
+    };
+  }, [containerSize.height, containerSize.width, position.x, position.y, scale, shouldTrackDragViewport, dragViewportTick]);
+
+  const shouldCull = !!viewportBounds && (!isDraggingCanvas && !draggingNodeId || isLargeScene);
+
+  const renderedMessages = React.useMemo(() => {
+    if (!viewportBounds || !shouldCull) return messages;
+
+    const NODE_WIDTH = 380;
+    const NODE_EST_HEIGHT = 460;
+    const margin = isLargeScene ? 180 : 240;
+
+    const intersectsViewport = (x: number, y: number) =>
+      x + NODE_WIDTH >= viewportBounds.left - margin &&
+      x <= viewportBounds.right + margin &&
+      y + NODE_EST_HEIGHT >= viewportBounds.top - margin &&
+      y <= viewportBounds.bottom + margin;
+
+    return messages.filter((msg) => {
+      if (msg.isPlaceholder) return true;
+      const pos = fastNodePositions.current[msg.id] || msg.position || { x: 0, y: 0 };
+      return intersectsViewport(pos.x, pos.y);
+    });
+  }, [messages, shouldCull, viewportBounds, isLargeScene]);
+
+  const lowDetailMode = scale < 0.62 || (isLargeScene && (isDraggingCanvas || !!draggingNodeId || renderedMessages.length > 42));
+  const simplifyConnections = isLargeScene && (scale < 0.75 || renderedMessages.length > 56);
+  const maxRenderedConnections = React.useMemo(() => {
+    if (messages.length > 420 || scale < 0.45) return draggingNodeId ? 110 : 160;
+    if (messages.length > 260 || scale < 0.65) return draggingNodeId ? 170 : 240;
+    if (messages.length > 140) return draggingNodeId ? 240 : 320;
+    return 500;
+  }, [messages.length, scale, draggingNodeId]);
+
   const selectedMessage = messages.find(m => m.id === selectedNodeId);
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -204,7 +362,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if ((e.target as HTMLElement).closest('.node-interactive')) return;
 
     setIsDraggingCanvas(true);
-    setCanvasDragStart({ x: e.clientX - fastPosition.current.x, y: e.clientY - fastPosition.current.y });
+    const nextStart = { x: e.clientX - fastPosition.current.x, y: e.clientY - fastPosition.current.y };
+    isDraggingCanvasRef.current = true;
+    canvasDragStartRef.current = nextStart;
     canvasClickStart.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -226,10 +386,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     setDraggingNodeId(msgId);
 
     const pos = fastNodePositions.current[msgId] || msg.position || { x: 0, y: 0 };
-    setNodeDragOffset({
+    const nextOffset = {
       x: e.clientX / scale - pos.x,
       y: e.clientY / scale - pos.y
-    });
+    };
+
+    draggingNodeIdRef.current = msgId;
+    nodeDragOffsetRef.current = nextOffset;
   }, [scale]);
 
   const handleNodeDownload = React.useCallback((e: React.MouseEvent, url: string) => {
@@ -244,56 +407,94 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   const handleNodeDelete = React.useCallback((e: React.MouseEvent, msgId: string) => {
     e.stopPropagation();
-    onDeleteMessage(msgId);
+    onDeleteMessage(msgId, { x: e.clientX, y: e.clientY });
   }, [onDeleteMessage]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDraggingCanvas) {
-      const newX = e.clientX - canvasDragStart.x;
-      const newY = e.clientY - canvasDragStart.y;
+  const applyDragMove = React.useCallback((clientX: number, clientY: number) => {
+    if (isDraggingCanvasRef.current) {
+      const newX = clientX - canvasDragStartRef.current.x;
+      const newY = clientY - canvasDragStartRef.current.y;
 
       fastPosition.current = { x: newX, y: newY };
 
       if (contentRef.current) {
-        contentRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scale})`;
+        contentRef.current.style.transform = `translate(${newX}px, ${newY}px) scale(${scaleRef.current})`;
       }
       if (bgRef.current) {
-        bgRef.current.style.transform = `translate(${newX % (20 * scale)}px, ${newY % (20 * scale)}px)`;
+        bgRef.current.style.transform = `translate(${newX % (20 * scaleRef.current)}px, ${newY % (20 * scaleRef.current)}px)`;
       }
-    } else if (draggingNodeId) {
+    } else if (draggingNodeIdRef.current) {
       // Use DOM transform directly for high-frequency dragging to avoid React re-renders
-      const newX = e.clientX / scale - nodeDragOffset.x;
-      const newY = e.clientY / scale - nodeDragOffset.y;
+      const newX = clientX / scaleRef.current - nodeDragOffsetRef.current.x;
+      const newY = clientY / scaleRef.current - nodeDragOffsetRef.current.y;
 
-      const nodeEl = nodeRefs.current[draggingNodeId];
+      const activeNodeId = draggingNodeIdRef.current;
+      const nodeEl = activeNodeId ? nodeRefs.current[activeNodeId] : null;
       if (nodeEl) {
         nodeEl.style.transform = `translate(${newX}px, ${newY}px)`;
       }
 
       // Update mutable ref rather than react state to skip massive re-renders
-      fastNodePositions.current[draggingNodeId] = { x: newX, y: newY };
+      if (activeNodeId) {
+        fastNodePositions.current[activeNodeId] = { x: newX, y: newY };
+      }
     }
-  };
+  }, []);
 
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (isDraggingCanvas) {
+  const applyDragEnd = React.useCallback((clientX: number, clientY: number) => {
+    const activeNodeId = draggingNodeIdRef.current;
+    const wasDraggingCanvas = isDraggingCanvasRef.current;
+
+    if (!activeNodeId && !wasDraggingCanvas) return;
+
+    if (wasDraggingCanvas) {
       setPosition(fastPosition.current);
       // Only deselect on a pure click (no significant movement), not on drag/pan
       if (canvasClickStart.current) {
-        const dx = e.clientX - canvasClickStart.current.x;
-        const dy = e.clientY - canvasClickStart.current.y;
+        const dx = clientX - canvasClickStart.current.x;
+        const dy = clientY - canvasClickStart.current.y;
         if (dx * dx + dy * dy < 25) {
           setSelectedNodeId(null);
         }
       }
       canvasClickStart.current = null;
     }
-    if (draggingNodeId && fastNodePositions.current[draggingNodeId]) {
-      onUpdateNodePosition(draggingNodeId, fastNodePositions.current[draggingNodeId]);
+
+    if (activeNodeId && fastNodePositions.current[activeNodeId]) {
+      onUpdateNodePosition(activeNodeId, fastNodePositions.current[activeNodeId]);
     }
+
+    isDraggingCanvasRef.current = false;
+    draggingNodeIdRef.current = null;
     setIsDraggingCanvas(false);
     setDraggingNodeId(null);
+  }, [onUpdateNodePosition]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    applyDragMove(e.clientX, e.clientY);
   };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    applyDragEnd(e.clientX, e.clientY);
+  };
+
+  useEffect(() => {
+    if (!isDraggingCanvas && !draggingNodeId) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => applyDragMove(e.clientX, e.clientY);
+    const handleWindowMouseUp = (e: MouseEvent) => applyDragEnd(e.clientX, e.clientY);
+    const handleWindowBlur = () => applyDragEnd(Number.NaN, Number.NaN);
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [isDraggingCanvas, draggingNodeId, applyDragMove, applyDragEnd]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -395,11 +596,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
     >
       <div
         ref={bgRef}
-        className="absolute inset-0 opacity-10 pointer-events-none"
+        className="absolute inset-0 opacity-10 pointer-events-none [will-change:transform]"
         style={{
           backgroundImage: 'radial-gradient(hsl(var(--foreground)) 1px, transparent 1px)',
           backgroundSize: `${20 * scale}px ${20 * scale}px`,
@@ -409,7 +609,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
       <div
         ref={contentRef}
-        className="absolute inset-0 origin-top-left"
+        className="absolute inset-0 origin-top-left [will-change:transform]"
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`
         }}
@@ -418,9 +618,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           messages={messages}
           fastNodePositions={fastNodePositions}
           isDragging={!!draggingNodeId}
+          simplified={simplifyConnections}
+          maxRenderedConnections={maxRenderedConnections}
+          viewportBounds={shouldCull ? viewportBounds ?? undefined : undefined}
         />
 
-        {messages.map((msg) => {
+        {renderedMessages.map((msg) => {
           const pos = getEffectivePosition(msg);
           const isSelected = selectedNodeId === msg.id;
 
@@ -438,6 +641,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 <CanvasNode
                   msg={msg}
                   isSelected={isSelected}
+                  lowDetail={lowDetailMode}
                   isChinese={isChinese}
                   t={t}
                   tChat={tChat}

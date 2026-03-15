@@ -4,15 +4,21 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "check:pm": "node scripts/check-package-manager.cjs",
+    "dev": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();process.exit(require(p.join(root,'scripts','run-next.cjs'))('dev'));\"",
+    "build": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();process.exit(require(p.join(root,'scripts','run-next.cjs'))('build'));\"",
+    "test:security": "node tests/security/route-guards.smoke.mjs",
+    "start": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();process.exit(require(p.join(root,'scripts','run-next.cjs'))('start'));\"",
+    "lint": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();process.exit(require(p.join(root,'scripts','run-next.cjs'))('lint'));\"",
+    "predev": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();require(p.join(root,'scripts','ensure-next-cjs.cjs'));\"",
+    "prebuild": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();require(p.join(root,'scripts','ensure-next-cjs.cjs'));\"",
+    "prestart": "node -e \"const fs=require('node:fs');const p=require('node:path');const n=v=>typeof v==='string'&&v.startsWith('\\\\\\\\?\\\\')?v.slice(4):v;const c=[process.env.npm_config_local_prefix,process.env.INIT_CWD,process.env.npm_package_json&&p.dirname(process.env.npm_package_json),process.cwd()].map(n).filter(Boolean);const root=c.find(d=>{try{return fs.existsSync(p.join(d,'package.json'));}catch{return false;}})||c[0]||process.cwd();require(p.join(root,'scripts','ensure-next-cjs.cjs'));\""
   },
   "dependencies": {
     "@creem_io/nextjs": "^0.4.0",
+    "@fontsource-variable/manrope": "^5.2.8",
+    "@fontsource-variable/outfit": "^5.2.8",
     "@google/genai": "^1.30.0",
-    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@radix-ui/react-avatar": "^1.1.1",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

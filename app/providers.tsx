@@ -1,12 +1,12 @@
 import { SupabaseProvider } from "@/components/providers/supabase-provider";
-import { getServerSession } from "@/lib/supabase/session";
 import { LazyMotion, domAnimation } from "framer-motion";
+import { ClientPerformanceTracker } from "@/components/observability/ClientPerformanceTracker";
 
-export async function Providers({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession();
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SupabaseProvider initialSession={session}>
+    <SupabaseProvider initialSession={null}>
       <LazyMotion features={domAnimation}>
+        <ClientPerformanceTracker />
         {children}
       </LazyMotion>
     </SupabaseProvider>
