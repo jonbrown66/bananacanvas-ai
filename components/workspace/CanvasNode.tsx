@@ -59,12 +59,20 @@ const avatarVariants = cva(
     }
 );
 
+const MemoMarkdown = memo(
+    ({ text }: { text: string }) => <Markdown>{text}</Markdown>,
+    (prev, next) => prev.text === next.text
+);
+
 interface CanvasNodeProps {
     msg: Message;
     isSelected: boolean;
+    lowDetail: boolean;
     isChinese: boolean;
     t: any;
     tChat: any;
+    nodeWidth?: number;
+    isAbsolute?: boolean;
     onMouseDown: (e: React.MouseEvent, msgId: string) => void;
     onDownload: (e: React.MouseEvent, url: string) => void;
     onRegenerate: (e: React.MouseEvent, msg: Message) => void;
@@ -74,22 +82,31 @@ interface CanvasNodeProps {
 export const CanvasNode = memo(({
     msg,
     isSelected,
+    lowDetail,
     isChinese,
     t,
     tChat,
+    nodeWidth = 380,
+    isAbsolute = true,
     onMouseDown,
     onDownload,
     onRegenerate,
     onDelete
 }: CanvasNodeProps) => {
     const isPlaceholder = msg.isPlaceholder === true;
+    const formattedTime = React.useMemo(
+        () => new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        [msg.timestamp]
+    );
 
     return (
         <div
             className={cn(
-                "node-interactive absolute w-[380px] transition-shadow duration-200 group",
+                "node-interactive transition-shadow duration-200 group",
+                isAbsolute && "absolute",
                 isPlaceholder && "generating-glow"
             )}
+            style={{ width: `${nodeWidth}px` }}
             onMouseDown={(e) => onMouseDown(e, msg.id)}
         >
             {/* Layer 2: SVG spinning dashed border */}
@@ -214,7 +231,11 @@ export const CanvasNode = memo(({
                         <>
                             {(!msg.imageUrl || msg.role === 'user') && (
                                 <div className="text-sm text-card-foreground leading-relaxed line-clamp-6 mb-2">
-                                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                    {lowDetail ? (
+                                        <span>{msg.text.slice(0, 220)}{msg.text.length > 220 ? '...' : ''}</span>
+                                    ) : (
+                                        <MemoMarkdown text={msg.text} />
+                                    )}
                                 </div>
                             )}
 
@@ -238,8 +259,10 @@ export const CanvasNode = memo(({
                 <div className="px-4 py-2 bg-muted/30 border-t border-border flex justify-between items-center text-[10px] text-muted-foreground">
                     {isPlaceholder ? (
                         <div className="skeleton-bar h-2 w-12" />
+                    ) : lowDetail ? (
+                        <span>...</span>
                     ) : (
-                        <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{formattedTime}</span>
                     )}
                     {isSelected && !isPlaceholder && <span className="text-orange-500 font-medium">{t('active')}</span>}
                 </div>

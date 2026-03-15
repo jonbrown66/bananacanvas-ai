@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from '@/i18n/routing';
@@ -16,14 +16,8 @@ export function LanguageSwitcher() {
     const router = useRouter();
     const pathname = usePathname();
 
-    const handleSwitch = (newLocale: string) => {
-        // 使用原生 location 来替换第一段语言前缀，能够有效避免 next-intl 未显式声明的动态参数报错
-        const currentPath = window.location.pathname;
-        const newPath = currentPath.replace(/^\/(en|zh-CN)/, `/${newLocale}`);
-
-        // 拼接上现有的 query 参数并进行跳转
-        const currentSearch = window.location.search;
-        window.location.href = `${newPath}${currentSearch}`;
+    const handleSwitch = (newLocale: 'en' | 'zh-CN') => {
+        router.replace(pathname, { locale: newLocale });
     };
 
     return (

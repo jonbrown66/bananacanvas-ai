@@ -1,19 +1,96 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export const HeroSection = () => {
     const t = useTranslations('Landing');
+    const shouldReduceMotion = usePrefersReducedMotion();
+    const heroRef = useRef<HTMLDivElement>(null);
+    const heroContentRef = useRef<HTMLDivElement>(null);
+    const heroMockupRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const hero = heroRef.current;
+        const content = heroContentRef.current;
+        const mockup = heroMockupRef.current;
+
+        if (!hero || !content || !mockup) return;
+
+        if (shouldReduceMotion) {
+            content.style.opacity = '';
+            content.style.transform = '';
+            content.style.willChange = '';
+            mockup.style.opacity = '';
+            mockup.style.transform = '';
+            mockup.style.willChange = '';
+            return;
+        }
+
+        let rafId: number | null = null;
+
+        const update = () => {
+            rafId = null;
+
+            const startY = hero.offsetTop + 40;
+            const fadeDistance = Math.max(hero.offsetHeight * 0.82, window.innerHeight * 1.05, 1);
+            const progress = Math.min(Math.max((window.scrollY - startY) / fadeDistance, 0), 1);
+
+            if (progress <= 0.01) {
+                content.style.opacity = '';
+                content.style.transform = '';
+                content.style.willChange = '';
+
+                mockup.style.opacity = '';
+                mockup.style.transform = '';
+                mockup.style.willChange = '';
+                return;
+            }
+
+            const contentOpacity = Math.max(0, 1 - progress * 1.35);
+            const contentTranslate = progress * 54;
+            const contentScale = 1 - progress * 0.045;
+
+            const mockupOpacity = Math.max(0, 1 - progress * 1.12);
+            const mockupTranslate = progress * 44;
+            const mockupScale = 1 - progress * 0.04;
+
+            content.style.opacity = String(contentOpacity);
+            content.style.transform = `translate3d(0, ${contentTranslate}px, 0) scale(${contentScale})`;
+            content.style.willChange = progress > 0 && progress < 1 ? 'opacity, transform' : '';
+
+            mockup.style.opacity = String(mockupOpacity);
+            mockup.style.transform = `translate3d(0, ${mockupTranslate}px, 0) scale(${mockupScale})`;
+            mockup.style.willChange = progress > 0 && progress < 1 ? 'opacity, transform' : '';
+        };
+
+        const scheduleUpdate = () => {
+            if (rafId !== null) return;
+            rafId = window.requestAnimationFrame(update);
+        };
+
+        update();
+        window.addEventListener('scroll', scheduleUpdate, { passive: true });
+        window.addEventListener('resize', scheduleUpdate);
+
+        return () => {
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+            }
+            window.removeEventListener('scroll', scheduleUpdate);
+            window.removeEventListener('resize', scheduleUpdate);
+        };
+    }, [shouldReduceMotion]);
 
     return (
-        <>
+        <div id="hero" ref={heroRef} className="relative">
             {/* Hero Section */}
-            <section id="hero" className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 relative overflow-hidden">
-                <div className="max-w-5xl mx-auto text-center relative z-10">
+            <section className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 relative overflow-hidden">
+                <div ref={heroContentRef} className="max-w-5xl mx-auto text-center relative z-10 transition-emphasis">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted border border-border text-brand-secondary text-xs font-medium mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-[0_0_15px_-3px_rgba(249,115,22,0.15)] dark:shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)]">
                         <Sparkles size={12} className="text-brand" />
                         <span>{t('newFeature')}</span>
@@ -38,15 +115,15 @@ export const HeroSection = () => {
 
                 {/* Abstract Background Elements */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl -z-10 pointer-events-none">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/10 rounded-full blur-[128px] opacity-30 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-foreground/5 rounded-full blur-[128px] opacity-20 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
+                    <div className="absolute top-1/4 left-1/4 w-72 h-72 md:w-96 md:h-96 bg-brand/10 rounded-full blur-3xl md:blur-[128px] opacity-30 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
+                    <div className="absolute bottom-1/4 right-1/4 w-72 h-72 md:w-96 md:h-96 bg-foreground/5 rounded-full blur-3xl md:blur-[128px] opacity-20 mix-blend-multiply dark:mix-blend-lighten pointer-events-none"></div>
                 </div>
             </section>
 
             {/* UI Mockup Section */}
             <section className="px-6 pb-24 relative z-20 -mt-12 md:-mt-20">
                 <div className="max-w-6xl mx-auto">
-                    <div className="relative rounded-xl bg-card border border-border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500">
+                    <div ref={heroMockupRef} className="relative rounded-xl bg-card border border-border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500 transition-emphasis">
                         {/* Window Controls */}
                         <div className="h-10 bg-muted border-b border-border flex items-center px-4 gap-2">
                             <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
@@ -81,6 +158,6 @@ export const HeroSection = () => {
                     </div>
                 </div>
             </section>
-        </>
+        </div>
     );
 };

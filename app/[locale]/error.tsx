@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { useRouter } from "@/i18n/routing";
 
 export default function Error({
     error,
@@ -11,6 +12,8 @@ export default function Error({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
+    const router = useRouter();
+
     useEffect(() => {
         console.error(error);
     }, [error]);
@@ -25,7 +28,7 @@ export default function Error({
                 We apologize for the inconvenience. An unexpected error has occurred.
             </p>
             <div className="flex gap-2">
-                <Button onClick={() => window.location.href = '/'} variant="outline">
+                <Button onClick={() => router.push('/')} variant="outline">
                     Go Home
                 </Button>
                 <Button onClick={() => reset()}>

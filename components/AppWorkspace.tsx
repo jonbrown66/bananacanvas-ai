@@ -10,8 +10,10 @@ import { Icons } from './Icons';
 import { generateOrEditImage } from '../services/geminiService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
+import { reportClientMetric } from '@/lib/perf/client-metrics';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Tooltip,
   TooltipProvider,
@@ -60,6 +62,7 @@ export default function App({
   initialSessionId
 }: AppProps) {
   const t = useTranslations('Workspace');
+  const tSecurity = useTranslations('Settings.Security');
 
   // Connect to global Zustand Store
   // Connect to global Zustand Store with useShallow for array/object properties
@@ -71,13 +74,19 @@ export default function App({
   const setSessions = useWorkspaceStore(s => s.setSessions);
   const currentSessionId = useWorkspaceStore(s => s.currentSessionId);
   const setCurrentSessionId = useWorkspaceStore(s => s.setCurrentSessionId);
-  const setSessionLoaded = useWorkspaceStore(s => s.setSessionLoaded);
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || 'chat');
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [appLoading, setAppLoading] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{
+    messageId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const inflightMessageLoadsRef = React.useRef<Map<string, Promise<void>>>(new Map());
+  const workspaceMountedAtRef = React.useRef(performance.now());
+  const shellReadyReportedRef = React.useRef(false);
 
   // Sync state with props (e.g. when session loads)
   useEffect(() => {
@@ -90,47 +99,92 @@ export default function App({
     }));
   }, [userName, userEmail, avatarUrl]);
 
-  const loadMessagesForProject = async (projectId: string) => {
+  const loadMessagesForProject = useCallback(async (
+    projectId: string,
+    reason: 'initial' | 'switch' | 'prefetch' = 'switch'
+  ) => {
     if (!projectId || projectId === 'temp' || projectId === '') {
       console.warn("Skipping message load for invalid project ID:", projectId);
       return;
     }
 
-    setLoadingMessages(true);
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: true })
-        .returns<Database['public']['Tables']['messages']['Row'][]>();
-
-      if (error) {
-        console.error(`Supabase error loading messages for project ${projectId}:`, {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return;
-      }
-
-      const mapped: Message[] = (data || []).map((m) => ({
-        id: m.id,
-        role: m.author_role as 'user' | 'model',
-        text: m.content || '',
-        imageUrl: m.image_url || undefined,
-        timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
-        parentId: m.parent_id || undefined,
-        position: { x: Number(m.position_x || 0), y: Number(m.position_y || 0) }
-      }));
-
-      // updateMessages from the store inherently sets isLoaded to true
-      useWorkspaceStore.getState().updateMessages(projectId, mapped);
-    } finally {
-      setLoadingMessages(false);
+    const existingLoad = inflightMessageLoadsRef.current.get(projectId);
+    if (existingLoad) {
+      return existingLoad;
     }
-  };
+
+    const startedAt = performance.now();
+
+    const task = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: true })
+          .returns<Database['public']['Tables']['messages']['Row'][]>();
+
+        if (error) {
+          const info = {
+            code: (error as any)?.code ?? null,
+            message: (error as any)?.message ?? null,
+            details: (error as any)?.details ?? null,
+            hint: (error as any)?.hint ?? null
+          };
+          // Avoid noisy dev overlay from console.error on recoverable fetch issues.
+          console.warn(`Supabase message load failed for project ${projectId}:`, info);
+          useWorkspaceStore.getState().updateMessages(projectId, []);
+          reportClientMetric({
+            name: 'workspace_messages_load_failed',
+            value: Number((performance.now() - startedAt).toFixed(2)),
+            unit: 'ms',
+            level: 'warn',
+            tags: { reason, project_id: projectId }
+          });
+          return;
+        }
+
+        const mapped: Message[] = (data || []).map((m) => ({
+          id: m.id,
+          role: m.author_role as 'user' | 'model',
+          text: m.content || '',
+          imageUrl: m.image_url || undefined,
+          timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+          parentId: m.parent_id || undefined,
+          position: { x: Number(m.position_x || 0), y: Number(m.position_y || 0) }
+        }));
+
+        // updateMessages from the store inherently sets isLoaded to true
+        useWorkspaceStore.getState().updateMessages(projectId, mapped);
+        reportClientMetric({
+          name: 'workspace_messages_load_duration',
+          value: Number((performance.now() - startedAt).toFixed(2)),
+          unit: 'ms',
+          tags: {
+            reason,
+            project_id: projectId,
+            messages: mapped.length
+          }
+        });
+      } catch (err) {
+        // Network interruptions or transient runtime issues should not block the workspace.
+        console.warn(`Unexpected message load failure for project ${projectId}:`, err);
+        useWorkspaceStore.getState().updateMessages(projectId, []);
+        reportClientMetric({
+          name: 'workspace_messages_load_exception',
+          value: Number((performance.now() - startedAt).toFixed(2)),
+          unit: 'ms',
+          level: 'warn',
+          tags: { reason, project_id: projectId }
+        });
+      } finally {
+        inflightMessageLoadsRef.current.delete(projectId);
+      }
+    })();
+
+    inflightMessageLoadsRef.current.set(projectId, task);
+    return task;
+  }, [supabase]);
 
   const createNewSession = async (title: string = t('newProject')) => {
     if (!userId) return;
@@ -178,6 +232,8 @@ export default function App({
       }
 
       setAppLoading(true);
+      const startedAt = performance.now();
+      let loadedProjectsCount = 0;
 
       try {
         // Parallel fetch for profile and projects
@@ -214,6 +270,7 @@ export default function App({
         }
 
         const projects = projectsRes.data as ProjectRow[];
+        loadedProjectsCount = projects.length;
         const normalized = projects.map((p) => ({
           id: p.id,
           title: p.title,
@@ -234,12 +291,26 @@ export default function App({
 
         // Optimization: Start loading messages for the initial session immediately
         // without waiting for the next render cycle of currentSessionId
-        loadMessagesForProject(startId);
+        loadMessagesForProject(startId, 'initial');
 
       } catch (err) {
         console.error("Workspace initialization failed:", err);
+        reportClientMetric({
+          name: 'workspace_bootstrap_failed',
+          value: Number((performance.now() - startedAt).toFixed(2)),
+          unit: 'ms',
+          level: 'warn'
+        });
       } finally {
         setAppLoading(false);
+        reportClientMetric({
+          name: 'workspace_bootstrap_duration',
+          value: Number((performance.now() - startedAt).toFixed(2)),
+          unit: 'ms',
+          tags: {
+            projects: loadedProjectsCount
+          }
+        });
       }
     };
 
@@ -277,14 +348,71 @@ export default function App({
     if (!currentSessionId) return;
     const target = sessions.find((s) => s.id === currentSessionId);
     if (target && !target.isLoaded) {
-      loadMessagesForProject(currentSessionId);
+      loadMessagesForProject(currentSessionId, 'switch');
     }
-  }, [currentSessionId, sessions]);
+  }, [currentSessionId, sessions, loadMessagesForProject]);
+
+  useEffect(() => {
+    if (appLoading || shellReadyReportedRef.current) return;
+    shellReadyReportedRef.current = true;
+    reportClientMetric({
+      name: 'workspace_shell_ready_duration',
+      value: Number((performance.now() - workspaceMountedAtRef.current).toFixed(2)),
+      unit: 'ms',
+      tags: {
+        sessions: sessions.length
+      }
+    });
+  }, [appLoading, sessions.length]);
+
+  useEffect(() => {
+    if (!currentSessionId || sessions.length < 2) return;
+    const candidates = sessions
+      .filter((session) => session.id !== currentSessionId && !session.isLoaded)
+      .slice(0, 2);
+
+    if (!candidates.length) return;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let idleCallbackId: number | null = null;
+
+    const prefetch = () => {
+      if (cancelled) return;
+      for (const candidate of candidates) {
+        void loadMessagesForProject(candidate.id, 'prefetch');
+      }
+    };
+
+    const requestIdle = (window as Window & {
+      requestIdleCallback?: (cb: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    }).requestIdleCallback;
+    const cancelIdle = (window as Window & {
+      cancelIdleCallback?: (handle: number) => void;
+    }).cancelIdleCallback;
+
+    if (typeof requestIdle === 'function') {
+      idleCallbackId = requestIdle(prefetch, { timeout: 1200 });
+    } else {
+      timeoutId = window.setTimeout(prefetch, 360);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleCallbackId !== null && typeof cancelIdle === 'function') {
+        cancelIdle(idleCallbackId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [currentSessionId, sessions, loadMessagesForProject]);
 
   const handlePrefetchSession = (id: string) => {
     const target = sessions.find((s) => s.id === id);
     if (target && !target.isLoaded) {
-      loadMessagesForProject(id);
+      loadMessagesForProject(id, 'prefetch');
     }
   };
 
@@ -310,50 +438,105 @@ export default function App({
     });
   }, [supabase, currentSessionId, createNewSession, setCurrentSessionId, setSessions]);
 
-  const handleDeleteMessage = useCallback(async (messageId: string) => {
-    if (!window.confirm(t('deleteMessageConfirm'))) return;
-    await supabase.from('messages').delete().eq('id', messageId);
-    await touchProject(currentSessionId);
-    setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) => {
-      if (s.id !== currentSessionId) return s;
-      return {
-        ...s,
-        messages: s.messages.filter((m: Message) => m.id !== messageId),
-        lastModified: Date.now()
-      };
-    }));
-  }, [t, supabase, currentSessionId, touchProject, setSessions]);
+  const handleDeleteMessage = useCallback((messageId: string, anchor?: { x: number; y: number }) => {
+    const fallbackX = typeof window !== 'undefined' ? window.innerWidth / 2 : 360;
+    const fallbackY = typeof window !== 'undefined' ? window.innerHeight / 2 : 260;
+    const x = anchor?.x ?? fallbackX;
+    const y = anchor?.y ?? fallbackY;
+    setPendingDelete({ messageId, x, y });
+  }, []);
+
+  const confirmDeleteMessage = useCallback(async () => {
+    if (!pendingDelete?.messageId) return;
+    const targetId = pendingDelete.messageId;
+    setPendingDelete(null);
+
+    try {
+      await supabase.from('messages').delete().eq('id', targetId);
+      await touchProject(currentSessionId);
+      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) => {
+        if (s.id !== currentSessionId) return s;
+        return {
+          ...s,
+          messages: s.messages.filter((m: Message) => m.id !== targetId),
+          lastModified: Date.now()
+        };
+      }));
+    } catch (error) {
+      console.error('Delete message failed:', error);
+    }
+  }, [pendingDelete, supabase, touchProject, currentSessionId, setSessions]);
+
+  useEffect(() => {
+    setPendingDelete(null);
+  }, [currentSessionId]);
+
+  const findNearestAncestorImage = useCallback((startParentId?: string) => {
+    if (!startParentId) return undefined;
+
+    const byId = new Map(currentSession.messages.map((m) => [m.id, m]));
+    let cursor: string | undefined = startParentId;
+    let guard = 0;
+
+    while (cursor && guard < 40) {
+      const node = byId.get(cursor);
+      if (!node) break;
+      if (node.imageUrl) return node.imageUrl;
+      cursor = node.parentId;
+      guard += 1;
+    }
+
+    return undefined;
+  }, [currentSession.messages]);
 
   const handleRegenerateMessage = useCallback((message: Message) => {
     let promptText = "";
+    let sourceImage: string | undefined = undefined;
     let parentId = "";
-    let sourceImage = undefined;
-    let isContext = false;
+    let userMessageId = "";
+    let targetModelId = "";
+    let targetModelPos: { x: number; y: number } | undefined = undefined;
 
     if (message.role === 'model') {
-      const parent = currentSession.messages.find(m => m.id === message.parentId);
-      if (parent) {
-        promptText = parent.text;
-        parentId = parent.parentId || ""; // Grandparent
-        sourceImage = parent.imageUrl; // If the prompt had an image
-        isContext = true;
-      } else {
-        return;
-      }
+      const parent = currentSession.messages.find(m => m.id === message.parentId && m.role === 'user');
+      if (!parent) return;
+
+      promptText = parent.text;
+      sourceImage = parent.imageUrl || findNearestAncestorImage(parent.parentId);
+      parentId = parent.parentId || "";
+      userMessageId = parent.id;
+      targetModelId = message.id;
+      targetModelPos = message.position;
     } else {
-      // User message
+      const latestModelChild = [...currentSession.messages]
+        .reverse()
+        .find((m) => m.role === 'model' && m.parentId === message.id);
+
       promptText = message.text;
+      sourceImage = message.imageUrl || findNearestAncestorImage(message.parentId);
       parentId = message.parentId || "";
-      sourceImage = message.imageUrl;
-      isContext = true; // Assume context for regen to avoid duplicating images in history visually
+      userMessageId = message.id;
+      targetModelId = latestModelChild?.id || "";
+      targetModelPos = latestModelChild?.position;
     }
 
-    if (promptText) {
-      const base64 = sourceImage ? sourceImage.split(',')[1] : undefined;
-      // We need to use refs or carefully manage dependencies for handleSendMessage here to avoid circular dep
-      handleSendMessage(promptText, base64, "1:1", parentId, isContext);
+    if (!promptText) return;
+
+    const base64 = sourceImage?.startsWith('data:image/')
+      ? sourceImage.split(',')[1]
+      : undefined;
+
+    if (targetModelId && userMessageId) {
+      handleSendMessage(promptText, base64, "1:1", parentId, true, {
+        replaceModelMessageId: targetModelId,
+        fixedUserMessageId: userMessageId,
+        fixedAiPosition: targetModelPos
+      });
+      return;
     }
-  }, [currentSession.messages]);// Caution: handleSendMessage is used inside
+
+    handleSendMessage(promptText, base64, "1:1", parentId, true);
+  }, [currentSession.messages, findNearestAncestorImage]);
 
   // 2. Canvas Optimization: Update Node Position
   const handleUpdateNodePosition = useCallback((nodeId: string, newPosition: { x: number; y: number }) => {
@@ -405,98 +588,189 @@ export default function App({
     };
   };
 
+  const buildPromptWithContext = useCallback((prompt: string, parentChainStartId?: string) => {
+    const cleanPrompt = prompt.trim();
+    if (!parentChainStartId) return cleanPrompt;
+
+    const byId = new Map(currentSession.messages.map((m) => [m.id, m]));
+    const chain: Message[] = [];
+    let cursor: string | undefined = parentChainStartId;
+    let guard = 0;
+
+    while (cursor && guard < 40) {
+      const node = byId.get(cursor);
+      if (!node) break;
+      chain.push(node);
+      cursor = node.parentId;
+      guard += 1;
+    }
+
+    const contextLines = chain
+      .reverse()
+      .filter((m) => Boolean((m.text || '').trim()))
+      .slice(-6)
+      .map((m) => {
+        const role = m.role === 'user' ? 'User' : 'Assistant';
+        const summary = (m.text || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+        return `${role}: ${summary}`;
+      });
+
+    if (!contextLines.length) return cleanPrompt;
+
+    return [
+      'Use prior context to keep output consistent.',
+      'Context:',
+      ...contextLines,
+      'Current request:',
+      cleanPrompt
+    ].join('\n');
+  }, [currentSession.messages]);
+
   const handleSendMessage = async (
     text: string,
     currentImageBase64?: string,
     aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16",
     parentId?: string,
-    isContextImage: boolean = false
+    isContextImage: boolean = false,
+    regenerateOptions?: {
+      replaceModelMessageId?: string;
+      fixedUserMessageId?: string;
+      fixedAiPosition?: { x: number; y: number };
+    }
   ) => {
 
     if (!currentSessionId) return;
 
+    const replaceModelMessageId = regenerateOptions?.replaceModelMessageId;
+    const fixedUserMessageId = regenerateOptions?.fixedUserMessageId;
+    const isReplaceMode = Boolean(replaceModelMessageId && fixedUserMessageId);
     const effectiveParentId = parentId || (currentSession.messages.length > 0 ? currentSession.messages[currentSession.messages.length - 1].id : undefined);
     const userPos = calculateNodePosition(effectiveParentId, currentSession.messages);
-    let userMsgId = "";
+    let userMsgId = fixedUserMessageId || "";
     let placeholderId = "";
+    let aiPos = regenerateOptions?.fixedAiPosition || { x: userPos.x + 450, y: userPos.y };
 
     setIsProcessing(true);
     setStatusMessage(t('processing'));
 
     try {
-      const { data: userRow, error: userError } = await supabase
-        .from('messages')
-        .insert({
-          project_id: currentSessionId,
-          author_role: 'user',
-          content: text,
-          image_url: currentImageBase64 && !isContextImage ? `data:image/png;base64,${currentImageBase64}` : null,
-          aspect_ratio: aspectRatio,
-          parent_id: effectiveParentId || null,
-          position_x: userPos.x,
-          position_y: userPos.y
-        } as any)
-        .select()
-        .single();
+      if (!isReplaceMode) {
+        const { data: userRow, error: userError } = await supabase
+          .from('messages')
+          .insert({
+            project_id: currentSessionId,
+            author_role: 'user',
+            content: text,
+            image_url: currentImageBase64 && !isContextImage ? `data:image/png;base64,${currentImageBase64}` : null,
+            aspect_ratio: aspectRatio,
+            parent_id: effectiveParentId || null,
+            position_x: userPos.x,
+            position_y: userPos.y
+          } as any)
+          .select()
+          .single();
 
-      if (userError) throw userError;
+        if (userError) throw userError;
 
-      const userMessageRow = userRow as MessageRow;
+        const userMessageRow = userRow as MessageRow;
 
-      userMsgId = userMessageRow?.id || Date.now().toString();
-      const userMsg: Message = {
-        id: userMsgId,
-        role: 'user',
-        text: text,
-        timestamp: userMessageRow?.created_at ? new Date(userMessageRow.created_at).getTime() : Date.now(),
-        parentId: effectiveParentId,
-        position: userPos,
-        imageUrl: (currentImageBase64 && !isContextImage) ? `data:image/png;base64,${currentImageBase64}` : undefined
-      };
+        userMsgId = userMessageRow?.id || Date.now().toString();
+        const userMsg: Message = {
+          id: userMsgId,
+          role: 'user',
+          text: text,
+          timestamp: userMessageRow?.created_at ? new Date(userMessageRow.created_at).getTime() : Date.now(),
+          parentId: effectiveParentId,
+          position: userPos,
+          imageUrl: (currentImageBase64 && !isContextImage) ? `data:image/png;base64,${currentImageBase64}` : undefined
+        };
 
-      const updatedMessages = [...currentSession.messages, userMsg];
+        const updatedMessages = [...currentSession.messages, userMsg];
 
-      // Auto-title logic: If this is the first message, update the project title
-      let newTitle = currentSession.title;
-      if (currentSession.messages.length === 0) {
-        newTitle = text.slice(0, 50);
-        await supabase.from('projects').update({ title: newTitle } as any).eq('id', currentSessionId);
+        // Auto-title logic: If this is the first message, update the project title
+        let newTitle = currentSession.title;
+        if (currentSession.messages.length === 0) {
+          newTitle = text.slice(0, 50);
+          await supabase.from('projects').update({ title: newTitle } as any).eq('id', currentSessionId);
+        }
+
+        setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
+          s.id === currentSessionId
+            ? {
+              ...s,
+              messages: updatedMessages,
+              lastModified: Date.now(),
+              title: newTitle
+            }
+            : s
+        ));
+        await touchProject(currentSessionId);
+
+        // Insert a placeholder skeleton node immediately so the canvas shows it
+        aiPos = { x: userPos.x + 450, y: userPos.y };
+        placeholderId = `placeholder-${Date.now()}`;
+        const placeholderMsg: Message = {
+          id: placeholderId,
+          role: 'model',
+          text: statusMessage || t('processing'),
+          timestamp: Date.now(),
+          parentId: userMsgId,
+          position: aiPos,
+          isPlaceholder: true
+        };
+        const messagesWithPlaceholder = [...updatedMessages, placeholderMsg];
+
+        setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
+          s.id === currentSessionId
+            ? { ...s, messages: messagesWithPlaceholder, lastModified: Date.now() }
+            : s
+        ));
+      } else {
+        if (!userMsgId || !replaceModelMessageId) {
+          throw new Error('Regenerate target is invalid.');
+        }
+
+        placeholderId = replaceModelMessageId;
+        const existingTarget = currentSession.messages.find((m) => m.id === replaceModelMessageId);
+        if (existingTarget?.position) {
+          aiPos = existingTarget.position;
+        }
+
+        const placeholderMsg: Message = {
+          id: placeholderId,
+          role: 'model',
+          text: statusMessage || t('processing'),
+          timestamp: Date.now(),
+          parentId: userMsgId,
+          position: aiPos,
+          isPlaceholder: true
+        };
+
+        setSessions((prevSessions: WorkspaceSession[]) =>
+          prevSessions.map((s: WorkspaceSession) => {
+            if (s.id !== currentSessionId) return s;
+            let replaced = false;
+            const nextMessages = s.messages.map((m: Message) => {
+              if (m.id !== placeholderId) return m;
+              replaced = true;
+              return {
+                ...placeholderMsg,
+                position: m.position || aiPos,
+                parentId: m.parentId || userMsgId
+              };
+            });
+            return {
+              ...s,
+              messages: replaced ? nextMessages : [...nextMessages, placeholderMsg],
+              lastModified: Date.now()
+            };
+          })
+        );
       }
 
-      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
-        s.id === currentSessionId
-          ? {
-            ...s,
-            messages: updatedMessages,
-            lastModified: Date.now(),
-            title: newTitle
-          }
-          : s
-      ));
-      await touchProject(currentSessionId);
-
-      // Insert a placeholder skeleton node immediately so the canvas shows it
-      const aiPos = { x: userPos.x + 450, y: userPos.y };
-      placeholderId = `placeholder-${Date.now()}`;
-      const placeholderMsg: Message = {
-        id: placeholderId,
-        role: 'model',
-        text: statusMessage || t('generating'),
-        timestamp: Date.now(),
-        parentId: userMsgId,
-        position: aiPos,
-        isPlaceholder: true
-      };
-      const messagesWithPlaceholder = [...updatedMessages, placeholderMsg];
-
-      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
-        s.id === currentSessionId
-          ? { ...s, messages: messagesWithPlaceholder, lastModified: Date.now() }
-          : s
-      ));
-
+      const contextualPrompt = buildPromptWithContext(text, effectiveParentId);
       const response = await generateOrEditImage({
-        prompt: text,
+        prompt: contextualPrompt,
         base64Image: currentImageBase64,
         aspectRatio: aspectRatio,
         onStatusUpdate: (msg) => {
@@ -515,72 +789,103 @@ export default function App({
         }
       });
 
-      const aiContent = response.text || (response.imageUrl ? t('imageGenerated') : t('processedThat'));
+      const aiContent = (response.text || '').trim() || (response.imageUrl ? '' : t('processedThat'));
+      let aiMsg: Message;
 
-      const { data: aiRow, error: aiError } = await supabase
-        .from('messages')
-        .insert({
-          project_id: currentSessionId,
-          author_role: 'model',
-          content: aiContent,
-          image_url: response.imageUrl || null,
-          aspect_ratio: aspectRatio,
-          parent_id: userMsgId,
-          position_x: aiPos.x,
-          position_y: aiPos.y
-        } as any)
-        .select()
-        .single();
+      if (isReplaceMode && replaceModelMessageId) {
+        const { data: updatedRow, error: updateError } = await supabase
+          .from('messages')
+          .update({
+            content: aiContent,
+            image_url: response.imageUrl || null,
+            aspect_ratio: aspectRatio || null,
+            parent_id: userMsgId || null,
+            position_x: aiPos.x,
+            position_y: aiPos.y
+          } as any)
+          .eq('id', replaceModelMessageId)
+          .select()
+          .single();
 
-      if (aiError) throw aiError;
+        if (updateError) throw updateError;
 
-      const aiMessageRow = aiRow as MessageRow;
+        const row = updatedRow as MessageRow;
+        aiMsg = {
+          id: row?.id || replaceModelMessageId,
+          role: 'model',
+          text: aiContent,
+          imageUrl: response.imageUrl,
+          timestamp: row?.created_at ? new Date(row.created_at).getTime() : Date.now(),
+          parentId: row?.parent_id || userMsgId,
+          position: {
+            x: Number(row?.position_x ?? aiPos.x),
+            y: Number(row?.position_y ?? aiPos.y)
+          }
+        };
+      } else {
+        const { data: aiRow, error: aiError } = await supabase
+          .from('messages')
+          .insert({
+            project_id: currentSessionId,
+            author_role: 'model',
+            content: aiContent,
+            image_url: response.imageUrl || null,
+            aspect_ratio: aspectRatio,
+            parent_id: userMsgId,
+            position_x: aiPos.x,
+            position_y: aiPos.y
+          } as any)
+          .select()
+          .single();
 
-      const aiMsg: Message = {
-        id: aiMessageRow?.id || Date.now().toString(),
-        role: 'model',
-        text: aiContent,
-        imageUrl: response.imageUrl,
-        timestamp: aiMessageRow?.created_at ? new Date(aiMessageRow.created_at).getTime() : Date.now(),
-        parentId: userMsgId,
-        position: aiPos
-      };
+        if (aiError) throw aiError;
+
+        const aiMessageRow = aiRow as MessageRow;
+
+        aiMsg = {
+          id: aiMessageRow?.id || Date.now().toString(),
+          role: 'model',
+          text: aiContent,
+          imageUrl: response.imageUrl,
+          timestamp: aiMessageRow?.created_at ? new Date(aiMessageRow.created_at).getTime() : Date.now(),
+          parentId: userMsgId,
+          position: aiPos
+        };
+      }
 
       // Replace the placeholder with the real AI message
-      setSessions((prevSessions: WorkspaceSession[]) => prevSessions.map((s: WorkspaceSession) =>
-        s.id === currentSessionId
-          ? {
+      setSessions((prevSessions: WorkspaceSession[]) =>
+        prevSessions.map((s: WorkspaceSession) => {
+          if (s.id !== currentSessionId) return s;
+          let replaced = false;
+          const nextMessages = s.messages.map((m: Message) => {
+            if (m.id !== placeholderId) return m;
+            replaced = true;
+            return aiMsg;
+          });
+          return {
             ...s,
-            messages: s.messages.map((m: Message) => m.id === placeholderId ? aiMsg : m),
+            messages: replaced ? nextMessages : [...nextMessages, aiMsg],
             lastModified: Date.now()
-          }
-          : s
-      ));
+          };
+        })
+      );
       await touchProject(currentSessionId);
-      const newCredits = Math.max(0, userProfile.credits - 5);
-      setUserProfile((prev: UserProfile) => ({ ...prev, credits: newCredits }));
-      if (userId) {
-        await supabase.from('profiles').update({ credits: newCredits } as any).eq('id', userId);
-
-        // Record credit deduction
-        await supabase.from('credit_transactions').insert({
-          user_id: userId,
-          amount: -5,
-          source: 'Image Generation',
-          metadata: { project_id: currentSessionId }
-        } as any);
-      }
 
     } catch (error: any) {
       console.error("Generation error:", error);
 
+      const errorMessageId = isReplaceMode && replaceModelMessageId
+        ? replaceModelMessageId
+        : Date.now().toString();
+
       const errorMsg: Message = {
-        id: Date.now().toString(),
+        id: errorMessageId,
         role: 'model',
         text: t('errorPrefix') + (error.message || t('unexpectedError')),
         timestamp: Date.now(),
         parentId: userMsgId || effectiveParentId,
-        position: { x: userPos.x + 450, y: userPos.y }
+        position: aiPos
       };
 
       // Replace placeholder with error message (or append if no placeholder)
@@ -588,11 +893,23 @@ export default function App({
         prevSessions.map((s: WorkspaceSession) => {
           if (s.id !== currentSessionId) return s;
           const hasPlaceholder = s.messages.some((m: Message) => m.id === placeholderId);
+          if (hasPlaceholder) {
+            return {
+              ...s,
+              messages: s.messages.map((m: Message) => m.id === placeholderId ? errorMsg : m)
+            };
+          }
+
+          if (isReplaceMode && replaceModelMessageId) {
+            return {
+              ...s,
+              messages: s.messages.map((m: Message) => m.id === replaceModelMessageId ? errorMsg : m)
+            };
+          }
+
           return {
             ...s,
-            messages: hasPlaceholder
-              ? s.messages.map((m: Message) => m.id === placeholderId ? errorMsg : m)
-              : [...s.messages, errorMsg]
+            messages: [...s.messages, errorMsg]
           };
         })
       );
@@ -737,6 +1054,46 @@ export default function App({
           </>
         </div>
       </div>
+      <AnimatePresence>
+        {pendingDelete && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed z-[80] w-[240px] md:w-[260px]"
+            style={{
+              left: `${Math.min(Math.max(8, pendingDelete.x + 10), (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280)}px`,
+              top: `${Math.min(Math.max(8, pendingDelete.y + 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - 120)}px`
+            }}
+          >
+            <div className="rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-xl p-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground">
+                  请确认是否删除？
+                </p>
+              </div>
+              <div className="mt-2.5 flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete(null)}
+                  className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-border bg-muted/50 text-foreground hover:bg-muted transition-colors"
+                >
+                  {tSecurity('cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteMessage}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity inline-flex items-center gap-1"
+                >
+                  <Trash2 size={12} />
+                  {t('delete')}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </TooltipProvider>
   );
 }

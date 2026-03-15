@@ -11,11 +11,12 @@ import { useSupabase } from "@/components/providers/supabase-provider";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from 'next-intl';
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { markFlowStart, markRouteStart, reportClientMetric } from "@/lib/perf/client-metrics";
 
 type AuthMode = "login" | "signup";
 
 export default function LoginPage() {
-    const { supabase, session } = useSupabase();
+    const { supabase, session, isSessionLoading } = useSupabase();
     const router = useRouter();
     const t = useTranslations('Auth');
 
@@ -28,10 +29,15 @@ export default function LoginPage() {
     const [message, setMessage] = useState<string | null>(null);
 
     useEffect(() => {
-        if (session) {
-            router.push("/app");
+        router.prefetch("/app");
+    }, [router]);
+
+    useEffect(() => {
+        if (!isSessionLoading && session) {
+            markRouteStart("/app");
+            router.replace("/app");
         }
-    }, [session, router]);
+    }, [isSessionLoading, session, router]);
 
     const handleEmailAuth = async () => {
         setError(null);
@@ -44,14 +50,21 @@ export default function LoginPage() {
 
         setLoading(true);
         const redirectTo = `${window.location.origin}/auth/callback?next=/app`;
+        const startedAt = performance.now();
 
         try {
             if (mode === "login") {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                setMessage(t('loginSuccess'));
-                router.push("/app");
-                router.refresh();
+                markFlowStart("auth_password_to_app", { method: "password" });
+                reportClientMetric({
+                    name: "auth_password_signin_api_duration",
+                    value: Number((performance.now() - startedAt).toFixed(2)),
+                    unit: "ms",
+                    tags: { mode: "login" }
+                });
+                markRouteStart("/app");
+                router.replace("/app");
             } else {
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -59,6 +72,12 @@ export default function LoginPage() {
                     options: { emailRedirectTo: redirectTo }
                 });
                 if (error) throw error;
+                reportClientMetric({
+                    name: "auth_signup_api_duration",
+                    value: Number((performance.now() - startedAt).toFixed(2)),
+                    unit: "ms",
+                    tags: { mode: "signup" }
+                });
                 setMessage(t('signUpSuccess'));
             }
         } catch (err: any) {
@@ -74,6 +93,7 @@ export default function LoginPage() {
         setLoading(true);
         const redirectTo = `${window.location.origin}/auth/callback?next=/app`;
         try {
+            markFlowStart("auth_oauth_to_app", { provider });
             const { error } = await supabase.auth.signInWithOAuth({
                 provider,
                 options: { redirectTo }

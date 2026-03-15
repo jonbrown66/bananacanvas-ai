@@ -1,3 +1,6 @@
+@import '@fontsource-variable/manrope/wght.css';
+@import '@fontsource-variable/outfit/wght.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -24,11 +27,22 @@
     --input: 0 0% 89.8%;
     --ring: 24.6 95% 53.1%;
     --radius: 0.5rem;
+
     --ai-accent-start: 45 93% 47%;
-    /* yellow-400 equivalent #eab308 */
     --ai-accent-end: 24 95% 53%;
-    /* orange-500 equivalent #f97316 */
     --ai-accent-text: 0 0% 100%;
+
+    --surface-1: 0 0% 100%;
+    --surface-2: 0 0% 98%;
+    --surface-3: 0 0% 96%;
+
+    --motion-duration-fast: 160ms;
+    --motion-duration-base: 240ms;
+    --motion-duration-slow: 360ms;
+    --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --motion-ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -56,11 +70,15 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 24.6 95% 53.1%;
+
     --ai-accent-start: 24 95% 53%;
-    /* In dark mode, maybe darker or same orange-500 */
     --ai-accent-end: 15 86% 43%;
-    /* orange-600 #ea580c */
     --ai-accent-text: 0 0% 98%;
+
+    --surface-1: 0 0% 7%;
+    --surface-2: 0 0% 10%;
+    --surface-3: 0 0% 13%;
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -74,16 +92,60 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    min-height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: "Manrope Variable", "Manrope", "Inter", "Segoe UI", ui-sans-serif, system-ui;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1, "cv01" 1, "cv11" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Outfit Variable", "Outfit", "Manrope Variable", "Manrope", "Inter", ui-sans-serif, system-ui;
+    @apply tracking-tighter;
   }
 }
 
 .glass-card {
-  @apply bg-white/70 dark:bg-black/70 backdrop-blur border border-gray-200 dark:border-gray-800 shadow-sm rounded-2xl;
+  @apply bg-white/70 dark:bg-black/70 backdrop-blur border border-gray-200/80 dark:border-gray-800 shadow-sm rounded-2xl;
 }
 
-/* Custom Scrollbar */
+.liquid-glass {
+  @apply bg-white/45 dark:bg-zinc-900/45 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)];
+}
+
+.premium-shadow {
+  @apply shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.35)];
+}
+
+.surface-panel {
+  background: hsl(var(--surface-1));
+  border: 1px solid hsl(var(--border) / 0.75);
+  border-radius: 1rem;
+}
+
+.transition-standard {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: var(--motion-duration-base);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+.transition-emphasis {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: var(--motion-duration-slow);
+  transition-timing-function: var(--motion-ease-emphasis);
+}
+
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -123,7 +185,6 @@
   }
 }
 
-/* Custom Animations for Landing Page */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -159,24 +220,21 @@
 }
 
 .animate-in {
-  animation-fill-mode: forwards;
+  animation-fill-mode: both;
   opacity: 0;
-  /* Start hidden */
 }
 
 .fade-in {
   animation-name: fadeIn;
 }
 
-.slide-in-from-bottom-4 {
-  animation-name: slideInFromBottom;
-}
-
-.slide-in-from-bottom-6 {
-  animation-name: slideInFromBottom;
-}
-
+.slide-in-from-bottom-4,
+.slide-in-from-bottom-6,
 .slide-in-from-bottom-8 {
+  animation-name: slideInFromBottom;
+}
+
+.slide-in-from-bottom-12 {
   animation-name: slideInFromBottom;
 }
 
@@ -196,11 +254,29 @@
   animation-delay: 300ms;
 }
 
+.delay-500 {
+  animation-delay: 500ms;
+}
+
 .duration-700 {
   animation-duration: 700ms;
 }
 
-/* ===== Landing Page High-End Animations ===== */
+.duration-1000 {
+  animation-duration: 1000ms;
+}
+
+.duration-1500 {
+  animation-duration: 1500ms;
+}
+
+.motion-fade-up {
+  animation: slideInFromBottom var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+
+.motion-fade-in {
+  animation: fadeIn var(--motion-duration-base) var(--motion-ease-standard) both;
+}
 
 @keyframes marquee {
   0% {
@@ -234,7 +310,6 @@
   animation-play-state: paused;
 }
 
-/* 渐变流光边框动画 */
 @keyframes border-beam {
   0% {
     background-position: 0% 50%;
@@ -254,35 +329,23 @@
   animation: border-beam 4000ms ease infinite;
 }
 
-.duration-1500 {
-  animation-duration: 1500ms;
-}
-
-/* 悬停下划线展开动画 */
 .hover-underline-anim {
   position: relative;
   display: inline-block;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: right calc(100% + 5px);
+  background-size: 0% 2px;
+  transition:
+    background-size var(--motion-duration-base) var(--motion-ease-standard),
+    color var(--motion-duration-base) var(--motion-ease-standard);
 }
 
-.hover-underline-anim::after {
-  content: '';
-  position: absolute;
-  width: 100%;
-  transform: scaleX(0);
-  height: 2px;
-  bottom: -4px;
-  left: 0;
-  background-color: hsl(var(--brand, 24.6 95% 53.1%));
-  transform-origin: bottom right;
-  transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+.hover-underline-anim:hover {
+  background-position: left calc(100% + 5px);
+  background-size: 100% 2px;
 }
 
-.hover-underline-anim:hover::after {
-  transform: scaleX(1);
-  transform-origin: bottom left;
-}
-
-/* 焦点卡片鼠标光晕效果基础 */
 .spotlight-card {
   position: relative;
   overflow: hidden;
@@ -298,7 +361,7 @@
   height: 400px;
   background: radial-gradient(circle, hsl(var(--brand, 24.6 95% 53.1%) / 0.15) 0%, transparent 60%);
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity var(--motion-duration-base) var(--motion-ease-standard);
   pointer-events: none;
   z-index: 0;
 }
@@ -307,9 +370,6 @@
   opacity: 1;
 }
 
-/* ===== Canvas Generating Node Animations ===== */
-
-/* Layer 0: Entrance — elastic scale-up */
 @keyframes glowEntrance {
   from {
     opacity: 0;
@@ -322,22 +382,17 @@
   }
 }
 
-/* Layer 1: Breathing — pulsing glow */
 @keyframes glowBreathe {
-
   0%,
   100% {
-    box-shadow: 0 0 0px hsl(24.6 95% 53.1% / 0),
-      0 0 0px hsl(24.6 95% 53.1% / 0);
+    box-shadow: 0 0 0 hsl(24.6 95% 53.1% / 0), 0 0 0 hsl(24.6 95% 53.1% / 0);
   }
 
   50% {
-    box-shadow: 0 0 16px hsl(24.6 95% 53.1% / 0.25),
-      0 0 40px hsl(24.6 95% 53.1% / 0.08);
+    box-shadow: 0 0 16px hsl(24.6 95% 53.1% / 0.25), 0 0 40px hsl(24.6 95% 53.1% / 0.08);
   }
 }
 
-/* Layer 2: SVG stroke rotation — driven by CanvasNode.tsx inline SVG */
 @keyframes strokeRotate {
   to {
     stroke-dashoffset: 0;
@@ -352,7 +407,6 @@
     glowBreathe 3s ease-in-out 0.5s infinite;
 }
 
-/* SVG overlay for the spinning dashed border */
 .generating-glow .glow-svg {
   position: absolute;
   inset: -3px;
@@ -363,7 +417,6 @@
   overflow: visible;
 }
 
-/* Skeleton shimmer animation */
 @keyframes skeletonShimmer {
   0% {
     background-position: -200% 0;
@@ -376,10 +429,49 @@
 
 .skeleton-bar {
   border-radius: 0.375rem;
-  background: linear-gradient(90deg,
-      hsl(var(--muted)) 25%,
-      hsl(var(--muted-foreground) / 0.08) 50%,
-      hsl(var(--muted)) 75%);
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.08) 50%,
+    hsl(var(--muted)) 75%
+  );
   background-size: 200% 100%;
   animation: skeletonShimmer 1.8s ease-in-out infinite;
+}
+
+@media (max-width: 1024px) {
+  .spotlight-card::before {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  .animate-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .animate-marquee,
+  .animate-marquee-reverse,
+  .animate-border-beam,
+  .generating-glow,
+  .skeleton-bar {
+    animation: none !important;
+  }
+
+  .hover-underline-anim {
+    transition: none;
+  }
 }

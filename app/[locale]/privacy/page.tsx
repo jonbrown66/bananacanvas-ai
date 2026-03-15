@@ -60,7 +60,7 @@ export default function PrivacyPolicy() {
                     <section>
                         <h2 className="text-2xl font-bold mb-4">5. Third-Party Services</h2>
                         <p className="text-muted-foreground leading-relaxed">
-                            Our service may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party&apos;s site. We strongly advise you to review the Privacy Policy of every site you visit. We use third-party payment processors (e.g., LemonSqueezy, Stripe) and do not store your full credit card information on our servers.
+                            Our service may contain links to other sites that are not operated by us. If you click on a third-party link, you will be directed to that third party&apos;s site. We strongly advise you to review the Privacy Policy of every site you visit. We use a third-party payment processor (Creem) and do not store your full credit card information on our servers.
                         </p>
                     </section>
 

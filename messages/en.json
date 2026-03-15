@@ -198,6 +198,8 @@
             "resolutionSupport": "{res} resolution support"
         },
         "FAQ": {
+            "header": "Everything You Need To Know.",
+            "description": "Got questions? We've got answers. If you don't find what you're looking for, reach out to our team.",
             "title": "Frequently Asked Questions",
             "q1": "How does the infinite canvas work?",
             "a1": "Unlike traditional chat interfaces, BananaCanvas lets you drag, drop, and organize your generations on an infinite whiteboard. This allows for better branching and visual organization of your ideas.",

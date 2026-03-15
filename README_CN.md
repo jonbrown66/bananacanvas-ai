@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="BananaCanvas AI" src="public/feature-canvas-black.png" />
 
 # BananaCanvas AI
-### 您的终极 AI 多模态无限创想空间
+### 无限画布 AI 多模态创作空间
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-green?style=flat-square&logo=supabase)](https://supabase.com/)
@@ -14,61 +14,74 @@
 
 </div>
 
-**BananaCanvas AI** 是一款专为企业级设计与创客打造的前沿 AI 工作区。我们开创性地将“智能对话驱动”与“无限节点白板”相融合，为您带来打破空间与灵感界限的多模态生产引擎。
+**BananaCanvas AI** 是一个基于 Next.js 与 Supabase 的 AI 创作工作台。产品将聊天流与无限画布结合，支持在对话中生成、编辑、组织图片与文本节点，适合创意构思与内容生产场景。
 
-## ✨ 颠覆传统的特性亮点
+## 核心特性
 
-- **🪐 无限画板与流式对话双区切换**：抛弃了僵化的传统聊天 UI，您能随时切换到无限缩放的画板中，所有生成的节点和想法都能被自由铺展、拖拽与归类。
-- **⚡ 超级重载性能架构**：搭载客户端**静默 WebP 压缩协议**，能将 AI 引擎传回的好几兆 4K 图片在存入数据库前体积疯狂压缩近 20 倍；并融入原生级的 `decoding="async"` 以及强悍的 Zustand 选择器订阅刷新，确保您即便在这个宇宙中塞入上百张高清巨图，页面交互也将稳定在 60 帧级别的丝滑流畅。
-- **🖼️ 瀑布流画廊**：高品质、极简灵妙的 Masonry Pinterest 风格公共组件陈列，打破平庸。
-- **💳 坚固的 SaaS 基建底座**：开箱即用集成了基于 Supabase RLS 的企业级权限体系与 Creem 免合规支付接入。
+- **聊天 + 画布双模式**：在线性对话和可视化节点画布之间快速切换。
+- **图像生成与编辑**：接入 Gemini 图像能力，支持文字生成与基于上下文图像继续创作。
+- **积分与订阅体系**：采用 Creem 支付，服务端 webhook 发放积分并维护订阅状态。
+- **多语言支持**：内置英文与中文文案，使用 `next-intl` 进行国际化路由与翻译。
 
-## 🛠️ 重型技术栈
+## 技术栈
 
-- **前端中枢**：[Next.js 15](https://nextjs.org/) (App Router), React 19, TypeScript
-- **视觉体系**：[Tailwind CSS](https://tailwindcss.com/), Radix UI, 以及带来物理级灵动阻尼控制的 Framer Motion
-- **状态流转**：Zustand
-- **云端后座**：[Supabase](https://supabase.com/) (Auth 安全认证, PostgreSQL 行级保护表)
-- **AI 神经**：Google Generative AI Engine (Gemini 3.1 Flash Image preview / Flux 生态)
+- 前端：Next.js 15（App Router）、React 19、TypeScript
+- UI：Tailwind CSS、Radix UI、Framer Motion
+- 状态管理：Zustand
+- 后端与数据库：Supabase（Auth + Postgres + RLS）
+- AI：Google Generative AI（Gemini）
 
-## 🏎️ 点火启动
+## 快速开始
 
-### 环境准备
-- Node.js 18+ (建议 pnpm)
-- Supabase 项目及密钥
-- Google Gemini API Key
+### 前置条件
 
-### 全自动组装
+- Node.js 18+
+- pnpm
+- Supabase 项目
+- Gemini API Key
+- Creem 商户配置（如需支付功能）
 
-1. **拖拽仓库:**
-   ```bash
-   git clone https://github.com/yourusername/bananacanvas-ai.git
-   cd bananacanvas-ai
-   ```
+### 安装步骤
 
-2. **注入依赖:**
-   ```bash
-   pnpm install
-   ```
+1. 克隆仓库
 
-3. **初始化命脉:**
-   新建 `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=你的_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=你的_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=数据库_service_key
+```bash
+git clone https://github.com/yourusername/bananacanvas-ai.git
+cd bananacanvas-ai
+```
 
-   GEMINI_API_KEY=你的_gemini_api密钥
-   ```
+2. 安装依赖
 
-4. **主引擎点火:**
-   ```bash
-   pnpm dev
-   ```
-   随后通过浏览器飞入 [http://localhost:3000](http://localhost:3000)
+```bash
+pnpm install
+```
 
-## 🛡️ 引力场安全隔离
-全面依托 Supabase 的行级安全控制（Row Level Security），您的每一次 Prompt 心血与天马行空的巨幅生成坐标均被无缝沙盒化保护。
+3. 配置环境变量
 
-## 📄 开源许可证
-本项目遵循 MIT License 协议开源，详见 [LICENSE](LICENSE) 文档。
+参考 `.env.example` 创建 `.env.local`，至少填写：
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+4. 启动开发服务
+
+```bash
+pnpm dev
+```
+
+打开 [http://localhost:3000](http://localhost:3000)。
+
+## 数据与安全
+
+- 依赖 Supabase RLS 保护用户项目与消息数据。
+- 支付状态与积分发放由服务端 Creem webhook 统一处理。
+- 关键接口已加入请求校验、限流与结构化日志。
+
+## 许可证
+
+本项目基于 MIT License，详见 [LICENSE](LICENSE)。

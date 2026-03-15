@@ -8,7 +8,6 @@ import dynamic from 'next/dynamic';
 import { Notification } from "@/components/ui/notification";
 import { Navbar } from "@/components/landing/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { Loader2 } from "lucide-react";
 
 // Lazy load below-the-fold components
 const FeaturesSection = dynamic(() => import("@/components/landing/FeaturesSection").then(mod => mod.FeaturesSection));
@@ -23,11 +22,6 @@ export const LandingPage = () => {
     const { supabase, session } = useSupabase();
     const [plan, setPlan] = useState<string>('free');
     const [notification, setNotification] = useState<{ message: string, show: boolean }>({ message: '', show: false });
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     useEffect(() => {
         const loadProfile = async () => {
@@ -47,12 +41,6 @@ export const LandingPage = () => {
     const showNotification = (message: string) => {
         setNotification({ message, show: true });
     };
-
-    if (!mounted) return (
-        <div className="min-h-screen bg-background flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-brand" />
-        </div>
-    );
 
     return (
         <div className="min-h-screen bg-background text-foreground font-sans selection:bg-brand-DEFAULT/30 selection:text-brand-light">

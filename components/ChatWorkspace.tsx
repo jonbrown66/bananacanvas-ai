@@ -20,7 +20,7 @@ interface ChatWorkspaceProps {
   messages: Message[];
   onSendMessage: (text: string, currentImageBase64?: string, aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16", parentId?: string, isContextImage?: boolean) => void | Promise<void>;
   isProcessing: boolean;
-  onDeleteMessage: (id: string) => void | Promise<void>;
+  onDeleteMessage: (id: string, anchor?: { x: number; y: number }) => void | Promise<void>;
   onRegenerateMessage: (msg: Message) => void;
   latestImage: string | null;
   statusMessage?: string;
@@ -175,7 +175,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const handleDeleteClick = React.useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    onDeleteMessage(id);
+    onDeleteMessage(id, { x: e.clientX, y: e.clientY });
   }, [onDeleteMessage]);
 
   return (
@@ -337,7 +337,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden relative group p-4">
             {activeImage ? (
               <div className="relative w-full h-full max-w-[90%] max-h-[90%] flex items-center justify-center">
-                {/* 使用 img 标签配合 max-w / max-h 可以让容器紧抱住图片真实渲染尺寸 */}
+                {/* Use img with max bounds to preserve natural aspect ratio and avoid layout jump. */}
                 <img
                   src={activeImage}
                   alt="Active workspace"
@@ -377,3 +377,4 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
+

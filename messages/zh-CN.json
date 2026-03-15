@@ -61,7 +61,7 @@
         "loadingWorkspace": "正在加载工作区...",
         "delete": "删除",
         "language": "语言",
-        "collapseSidebar": "折叠侧边栏",
+        "collapseSidebar": "收起侧边栏",
         "expandSidebar": "展开侧边栏",
         "pts": "分"
     },
@@ -198,6 +198,8 @@
             "resolutionSupport": "支持 {res} 分辨率"
         },
         "FAQ": {
+            "header": "你需要了解的一切。",
+            "description": "有问题？我们有答案。如果没找到你想看的内容，请联系我们的团队。",
             "title": "常见问题",
             "q1": "无限画布是如何工作的？",
             "a1": "与传统的聊天界面不同，BananaCanvas 允许您在无限白板上拖放和组织您的生成内容。这使得您的想法可以更好地分支和可视化组织。",

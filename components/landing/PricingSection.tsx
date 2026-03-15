@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Zap, Check, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/routing';
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useTranslations } from 'next-intl';
+import { motion } from 'framer-motion';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
+import { markRouteStart } from '@/lib/perf/client-metrics';
 
 interface PricingSectionProps {
     plan: string;
@@ -15,11 +18,18 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
     const t = useTranslations('LandingPage.Pricing');
     const router = useRouter();
     const { session } = useSupabase();
+    const shouldReduceMotion = usePrefersReducedMotion();
     const [pricingMode, setPricingMode] = useState<'monthly' | 'yearly' | 'credits'>('monthly');
     const [loadingProductId, setLoadingProductId] = useState<string | null>(null);
 
+    useEffect(() => {
+        router.prefetch('/login');
+        router.prefetch('/app');
+    }, [router]);
+
     const handlePurchase = async (productId: string) => {
         if (!session?.user?.id) {
+            markRouteStart('/login');
             router.push('/login');
             return;
         }
@@ -30,7 +40,12 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
             setLoadingProductId(productId);
 
             const redirectUrl = encodeURIComponent(window.location.origin + '/app/settings/billing/success');
-            const response = await fetch(`/api/payments/checkout?productId=${productId}&redirectUrl=${redirectUrl}`);
+            const response = await fetch(`/api/payments/checkout?productId=${productId}&redirectUrl=${redirectUrl}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            });
             const data = await response.json();
             if (data.url) {
                 window.location.href = data.url;
@@ -48,15 +63,15 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
 
     const handleUpgrade = async (targetPlan: string, productId: string) => {
         if (!session?.user?.id) {
+            markRouteStart('/login');
             router.push('/login');
             return;
         }
 
         const PLAN_LEVELS: Record<string, number> = {
             'free': 0,
-            'starter': 1,
-            'pro': 2,
-            'business': 3
+            'pro': 1,
+            'business': 2
         };
 
         const currentLevel = PLAN_LEVELS[plan] || 0;
@@ -121,7 +136,10 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                 t('resolutionSupport', { res: '1K' })
             ],
             buttonText: t('getStartedFree'),
-            action: () => router.push('/app'),
+            action: () => {
+                markRouteStart('/app');
+                router.push('/app');
+            },
             highlight: false
         },
         {
@@ -165,39 +183,66 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
             <div className="max-w-7xl mx-auto">
                 {/* Toggle */}
                 <div className="flex justify-center mb-16 relative z-20">
-                    <div className="bg-muted/30 p-1.5 rounded-full border border-border inline-flex relative">
+                    <div className="bg-muted/30 p-1.5 rounded-full border border-border inline-flex relative shadow-[0_12px_28px_-22px_rgba(0,0,0,0.3)]">
                         <button
                             onClick={() => setPricingMode('monthly')}
-                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'monthly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'monthly' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
-                            {t('monthly')}
+                            {pricingMode === 'monthly' && (
+                                <motion.span
+                                    layoutId="pricing-toggle-pill"
+                                    className="absolute inset-0 rounded-full bg-background shadow-sm"
+                                    transition={shouldReduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 420, damping: 34 }}
+                                />
+                            )}
+                            <span className="relative z-10">{t('monthly')}</span>
                         </button>
                         <button
                             onClick={() => setPricingMode('yearly')}
-                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'yearly' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'yearly' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
-                            {t('yearly')}
+                            {pricingMode === 'yearly' && (
+                                <motion.span
+                                    layoutId="pricing-toggle-pill"
+                                    className="absolute inset-0 rounded-full bg-background shadow-sm"
+                                    transition={shouldReduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 420, damping: 34 }}
+                                />
+                            )}
+                            <span className="relative z-10">{t('yearly')}</span>
                         </button>
                         <div className="w-px h-6 bg-border/50 my-auto mx-2"></div>
                         <button
                             onClick={() => setPricingMode('credits')}
-                            className={`px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'credits' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`relative z-10 px-8 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${pricingMode === 'credits' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                         >
-                            {t('credits')}
+                            {pricingMode === 'credits' && (
+                                <motion.span
+                                    layoutId="pricing-toggle-pill"
+                                    className="absolute inset-0 rounded-full bg-background shadow-sm"
+                                    transition={shouldReduceMotion ? { duration: 0.1 } : { type: 'spring', stiffness: 420, damping: 34 }}
+                                />
+                            )}
+                            <span className="relative z-10">{t('credits')}</span>
                         </button>
                     </div>
                 </div>
 
                 {pricingMode === 'credits' ? (
-                    <div className="max-w-7xl mx-auto">
+                    <motion.div
+                        initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+                        animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                        transition={shouldReduceMotion ? { duration: 0.1 } : { duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+                        className="max-w-7xl mx-auto"
+                    >
                         <div className="mb-8">
                             <h3 className="text-xl font-bold text-foreground mb-2">{t('creditPackages')}</h3>
                             <p className="text-muted-foreground">{t('creditPackagesDesc')}</p>
                         </div>
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {creditPackages.map((pkg, index) => (
-                                <div
+                                <motion.div
                                     key={index}
+                                    whileHover={shouldReduceMotion ? undefined : { y: -5 }}
                                     className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${pkg.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10' : 'border border-border hover:border-border/80 hover:shadow-lg hover:-translate-y-1'} flex flex-col`}
                                 >
                                     {pkg.highlight && (
@@ -227,16 +272,21 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                                             t('purchase')
                                         )}
                                     </button>
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
-                    </div>
+                    </motion.div>
                 ) : (
-                    <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                    <motion.div
+                        initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+                        animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                        transition={shouldReduceMotion ? { duration: 0.1 } : { duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+                        className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto"
+                    >
                         {subscriptionPlans.map((planItem, index) => (
-                            <div
+                            <motion.div
                                 key={index}
-
+                                whileHover={shouldReduceMotion ? undefined : { y: -5 }}
                                 className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${planItem.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10 flex flex-col' : 'border border-border hover:border-border/80 hover:-translate-y-1 hover:shadow-lg flex flex-col'}`}
                             >
                                 {planItem.highlight && (
@@ -278,9 +328,9 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                                         </li>
                                     ))}
                                 </ul>
-                            </div>
+                            </motion.div>
                         ))}
-                    </div>
+                    </motion.div>
                 )}
             </div>
         </section>
