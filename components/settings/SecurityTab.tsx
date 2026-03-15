@@ -50,7 +50,12 @@ export function SecurityTab() {
         setDeleting(true);
         setDeleteError(null);
         try {
-            const res = await fetch("/api/auth/delete", { method: "POST" });
+            const res = await fetch("/api/auth/delete", {
+                method: "POST",
+                headers: {
+                    "x-confirm-delete": "true"
+                }
+            });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body.error || "Delete failed");

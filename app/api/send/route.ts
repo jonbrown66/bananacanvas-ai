@@ -1,5 +1,7 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
+import { checkRateLimit, extractClientIp } from "@/lib/security/rate-limit";
+import { logApiEvent } from "@/lib/observability";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -16,28 +18,19 @@ const ContactSchema = z.object({
     message: z.string().min(1, "Message is required")
 });
 
-const rateLimitMap = new Map();
-
 export async function POST(request: Request) {
     try {
-        // Basic IP Rate Limiting
-        const forwardedFor = request.headers.get("x-forwarded-for");
-        const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown";
-
-        if (ip !== "unknown") {
-            const now = Date.now();
-            const windowMs = 60 * 1000; // 1 minute
-            const maxRequests = 3;
-
-            const userRequests = rateLimitMap.get(ip) || [];
-            const recentRequests = userRequests.filter((time: number) => now - time < windowMs);
-
-            if (recentRequests.length >= maxRequests) {
+        const ip = extractClientIp(request);
+        if (ip) {
+            const limitResult = await checkRateLimit({
+                key: `contact:${ip}`,
+                limit: 3,
+                windowSeconds: 60
+            });
+            if (!limitResult.allowed) {
+                logApiEvent("contact.rate_limited", { ip, source: limitResult.source }, "warn");
                 return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
             }
-
-            recentRequests.push(now);
-            rateLimitMap.set(ip, recentRequests);
         }
 
         const body = await request.json();
@@ -63,11 +56,14 @@ export async function POST(request: Request) {
         });
 
         if (error) {
+            logApiEvent("contact.send_failed", { message: String(error) }, "error");
             return NextResponse.json({ error }, { status: 500 });
         }
 
+        logApiEvent("contact.sent", { email });
         return NextResponse.json(data);
-    } catch (error) {
+    } catch (error: any) {
+        logApiEvent("contact.failed", { message: error?.message || "unknown" }, "error");
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

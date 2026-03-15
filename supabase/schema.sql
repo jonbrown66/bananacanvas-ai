@@ -75,6 +75,18 @@ create index if not exists messages_project_idx on public.messages(project_id);
 create index if not exists messages_project_parent_idx on public.messages(project_id, parent_id);
 create index if not exists messages_created_idx on public.messages(created_at desc);
 
+-- Webhook events idempotency table
+create table if not exists public.webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null,
+  event_key text not null,
+  event_type text,
+  payload jsonb default '{}'::jsonb,
+  created_at timestamptz default now() not null
+);
+create unique index if not exists webhook_events_provider_event_key_idx
+  on public.webhook_events(provider, event_key);
+
 -- Enable RLS
 alter table public.profiles enable row level security;
 alter table public.projects enable row level security;
@@ -110,47 +122,3 @@ for delete using (
   exists (select 1 from public.projects p where p.id = project_id and p.owner_id = auth.uid())
 );
 
--- Lemon Squeezy Integration
-
--- Update profiles table
-alter table public.profiles 
-add column if not exists lemon_squeezy_customer_id text,
-add column if not exists lemon_squeezy_subscription_id text;
-
--- Orders table (for one-time purchases like credits)
-create table if not exists public.lemon_squeezy_orders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  order_id text not null unique,
-  customer_id text not null,
-  status text not null,
-  total integer not null,
-  currency text not null,
-  credits_amount integer,
-  created_at timestamptz default now()
-);
-
--- Subscriptions table
-create table if not exists public.lemon_squeezy_subscriptions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  subscription_id text not null unique,
-  customer_id text not null,
-  status text not null,
-  variant_id text not null,
-  plan_name text,
-  renews_at timestamptz,
-  ends_at timestamptz,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
--- RLS for new tables
-alter table public.lemon_squeezy_orders enable row level security;
-alter table public.lemon_squeezy_subscriptions enable row level security;
-
-create policy orders_select_owner on public.lemon_squeezy_orders
-for select using (auth.uid() = user_id);
-
-create policy subscriptions_select_owner on public.lemon_squeezy_subscriptions
-for select using (auth.uid() = user_id);

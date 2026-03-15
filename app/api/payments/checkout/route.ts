@@ -3,6 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, NextRequest } from "next/server";
 import { z } from "zod";
+import { normalizeSuccessUrl } from "@/lib/security/route-guards";
+import { logApiEvent } from "@/lib/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,17 @@ const QuerySchema = z.object({
     redirectUrl: z.string().optional()
 });
 
+const allowedProductIds = new Set(
+    [
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_PRO,
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_BUSINESS,
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_300,
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_800,
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_2800,
+        process.env.NEXT_PUBLIC_CREEM_PRODUCT_ID_CREDITS_7200,
+    ].filter((id): id is string => Boolean(id))
+);
+
 async function handleCheckout(request: NextRequest) {
     try {
         const url = new URL(request.url);
@@ -25,6 +38,13 @@ async function handleCheckout(request: NextRequest) {
 
         if (!result.success) {
             return NextResponse.json({ error: result.error.issues[0].message }, { status: 400 });
+        }
+
+        const { productId, redirectUrl } = result.data;
+
+        if (!allowedProductIds.has(productId)) {
+            logApiEvent("checkout.invalid_product", { productId }, "warn");
+            return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
         }
 
         const cookieStore = await cookies();
@@ -57,21 +77,27 @@ async function handleCheckout(request: NextRequest) {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
+            logApiEvent("checkout.unauthorized", {}, "warn");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // Pass the request to the Creem SDK handler
         // The SDK reads 'metadata' (JSON string), 'referenceId', and 'successUrl' from query params
         // Map our params to what the SDK expects
+        url.searchParams.set('productId', productId);
         url.searchParams.set('metadata', JSON.stringify({ user_id: user.id }));
         url.searchParams.set('referenceId', user.id);
 
         // SDK expects 'successUrl' not 'redirectUrl' - map it
-        const redirectUrl = url.searchParams.get('redirectUrl');
-        if (redirectUrl) {
-            url.searchParams.set('successUrl', redirectUrl);
-            url.searchParams.delete('redirectUrl');
+        const safeSuccessUrl = normalizeSuccessUrl(redirectUrl, url.origin);
+        if (redirectUrl && !safeSuccessUrl) {
+            logApiEvent("checkout.invalid_redirect", { redirectUrl }, "warn");
+            return NextResponse.json({ error: "Invalid redirect URL" }, { status: 400 });
         }
+        if (safeSuccessUrl) {
+            url.searchParams.set('successUrl', safeSuccessUrl);
+        }
+        url.searchParams.delete('redirectUrl');
 
         const modifiedRequest = new NextRequest(url, request);
 
@@ -91,6 +117,7 @@ async function handleCheckout(request: NextRequest) {
         if (response.status === 307 || response.status === 303) {
             const location = response.headers.get("Location");
             if (location) {
+                logApiEvent("checkout.created", { userId: user.id, productId });
                 return NextResponse.json({ url: location });
             }
         }
@@ -98,9 +125,9 @@ async function handleCheckout(request: NextRequest) {
         return response;
     } catch (error: any) {
         console.error("Checkout Error:", error);
+        logApiEvent("checkout.failed", { message: error.message }, "error");
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 
-export const GET = handleCheckout;
 export const POST = handleCheckout;
