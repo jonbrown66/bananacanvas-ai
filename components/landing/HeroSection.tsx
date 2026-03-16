@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { motion } from 'framer-motion';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export const HeroSection = () => {
@@ -13,6 +14,7 @@ export const HeroSection = () => {
     const heroRef = useRef<HTMLDivElement>(null);
     const heroContentRef = useRef<HTMLDivElement>(null);
     const heroMockupRef = useRef<HTMLDivElement>(null);
+    const fadeEase = [0.22, 1, 0.36, 1] as const;
 
     useEffect(() => {
         const hero = heroRef.current;
@@ -90,27 +92,53 @@ export const HeroSection = () => {
         <div id="hero" ref={heroRef} className="relative">
             {/* Hero Section */}
             <section className="pt-32 pb-20 md:pt-48 md:pb-32 px-6 relative overflow-hidden">
-                <div ref={heroContentRef} className="max-w-5xl mx-auto text-center relative z-10 transition-emphasis">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted border border-border text-brand-secondary text-xs font-medium mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 shadow-[0_0_15px_-3px_rgba(249,115,22,0.15)] dark:shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)]">
-                        <Sparkles size={12} className="text-brand" />
-                        <span>{t('newFeature')}</span>
-                    </div>
-                    <h1 className="text-6xl md:text-8xl leading-[1.1] font-medium text-foreground mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-                        {t('heroTitle')}
-                    </h1>
-                    <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-                        {t('heroSubtitle')}
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-                        <Link
-                            href="/app"
-                            className="group relative w-full sm:w-auto px-10 py-4 bg-foreground text-background rounded-full font-semibold text-lg transition-all hover:-translate-y-1 hover:bg-foreground/90 hover:shadow-lg active:scale-95 overflow-hidden flex items-center justify-center gap-2"
+                <div ref={heroContentRef} className="max-w-5xl mx-auto text-center relative z-10">
+                    <motion.div
+                        initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+                        animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                        transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <motion.div
+                            initial={shouldReduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 10, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.42, ease: fadeEase, delay: 0.04 }}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted border border-border text-brand-secondary text-xs font-medium mb-8 shadow-[0_0_15px_-3px_rgba(249,115,22,0.15)] dark:shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)]"
                         >
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                {t('startCreating')} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                            </span>
-                        </Link>
-                    </div>
+                            <Sparkles size={12} className="text-brand" />
+                            <span>{t('newFeature')}</span>
+                        </motion.div>
+                        <motion.h1
+                            initial={shouldReduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 22, scale: 0.985 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.62, ease: fadeEase, delay: 0.12 }}
+                            className="text-6xl md:text-8xl leading-[1.1] font-medium text-foreground mb-8 tracking-tight"
+                        >
+                            {t('heroTitle')}
+                        </motion.h1>
+                        <motion.p
+                            initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.56, ease: fadeEase, delay: 0.22 }}
+                            className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed"
+                        >
+                            {t('heroSubtitle')}
+                        </motion.p>
+                        <motion.div
+                            initial={shouldReduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.5, ease: fadeEase, delay: 0.3 }}
+                            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+                        >
+                            <Link
+                                href="/app"
+                                className="group relative w-full sm:w-auto px-10 py-4 bg-foreground text-background rounded-full font-semibold text-lg transition-all hover:-translate-y-1 hover:bg-foreground/90 hover:shadow-lg active:scale-95 overflow-hidden flex items-center justify-center gap-2"
+                            >
+                                <span className="relative z-10 flex items-center justify-center gap-2">
+                                    {t('startCreating')} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                </span>
+                            </Link>
+                        </motion.div>
+                    </motion.div>
                 </div>
 
                 {/* Abstract Background Elements */}
@@ -123,38 +151,45 @@ export const HeroSection = () => {
             {/* UI Mockup Section */}
             <section className="px-6 pb-24 relative z-20 -mt-12 md:-mt-20">
                 <div className="max-w-6xl mx-auto">
-                    <div ref={heroMockupRef} className="relative rounded-xl bg-card border border-border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-500 transition-emphasis">
-                        {/* Window Controls */}
-                        <div className="h-10 bg-muted border-b border-border flex items-center px-4 gap-2">
-                            <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                            <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                            <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                            <div className="ml-4 px-3 py-1 bg-background/20 rounded text-xs text-muted-foreground font-mono">bananacanvas-pro.app</div>
-                        </div>
+                    <div ref={heroMockupRef}>
+                        <motion.div
+                            initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 28, scale: 0.985 }}
+                            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                            transition={shouldReduceMotion ? { duration: 0.01 } : { duration: 0.82, ease: [0.16, 1, 0.3, 1], delay: 0.34 }}
+                            className="relative rounded-xl bg-card border border-border shadow-2xl overflow-hidden"
+                        >
+                            {/* Window Controls */}
+                            <div className="h-10 bg-muted border-b border-border flex items-center px-4 gap-2">
+                                <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                                <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                                <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                                <div className="ml-4 px-3 py-1 bg-background/20 rounded text-xs text-muted-foreground font-mono">bananacanvas-pro.app</div>
+                            </div>
 
-                        {/* App Interface */}
-                        <div className="relative bg-background overflow-hidden">
-                            <Image
-                                src="/hero-image.png"
-                                alt="BananaCanvas Interface"
-                                width={1920}
-                                height={1080}
-                                className="w-full h-auto object-cover block dark:hidden"
-                                priority
-                                quality={85}
-                                sizes="(max-width: 1280px) 100vw, 1280px"
-                            />
-                            <Image
-                                src="/hero-image-black.png"
-                                alt="BananaCanvas Interface"
-                                width={1920}
-                                height={1080}
-                                className="w-full h-auto object-cover hidden dark:block"
-                                priority
-                                quality={85}
-                                sizes="(max-width: 1280px) 100vw, 1280px"
-                            />
-                        </div>
+                            {/* App Interface */}
+                            <div className="relative bg-background overflow-hidden">
+                                <Image
+                                    src="/hero-image.png"
+                                    alt="BananaCanvas Interface"
+                                    width={1920}
+                                    height={1080}
+                                    className="w-full h-auto object-cover block dark:hidden"
+                                    priority
+                                    quality={85}
+                                    sizes="(max-width: 1280px) 100vw, 1280px"
+                                />
+                                <Image
+                                    src="/hero-image-black.png"
+                                    alt="BananaCanvas Interface"
+                                    width={1920}
+                                    height={1080}
+                                    className="w-full h-auto object-cover hidden dark:block"
+                                    priority
+                                    quality={85}
+                                    sizes="(max-width: 1280px) 100vw, 1280px"
+                                />
+                            </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>

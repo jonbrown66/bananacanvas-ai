@@ -70,7 +70,7 @@ export const FeaturesSection = () => {
             variants={itemVariants}
             whileHover={shouldReduceMotion ? undefined : { y: -4 }}
             onMouseMove={handleMouseMove}
-            className="spotlight-card md:col-span-2 row-span-2 bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg hover:-translate-y-1 transition-emphasis"
+            className="spotlight-card md:col-span-2 row-span-2 bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg transition-emphasis"
           >
             <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.05)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:24px_24px]" />
             <div className="absolute top-8 left-8 z-10">
@@ -104,7 +104,7 @@ export const FeaturesSection = () => {
             variants={itemVariants}
             whileHover={shouldReduceMotion ? undefined : { y: -4 }}
             onMouseMove={handleMouseMove}
-            className="spotlight-card bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg hover:-translate-y-1 transition-emphasis"
+            className="spotlight-card bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg transition-emphasis"
           >
             <div className="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500 mb-4 transition-transform group-hover:scale-110 duration-300">
               <Zap size={24} />
@@ -118,7 +118,7 @@ export const FeaturesSection = () => {
             variants={itemVariants}
             whileHover={shouldReduceMotion ? undefined : { y: -4 }}
             onMouseMove={handleMouseMove}
-            className="spotlight-card bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg hover:-translate-y-1 transition-emphasis"
+            className="spotlight-card bg-card rounded-3xl p-8 border border-border shadow-sm relative overflow-hidden group hover:border-border/80 hover:shadow-lg transition-emphasis"
           >
             <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500 mb-4 transition-transform group-hover:scale-110 duration-300">
               <ImageIcon size={24} />

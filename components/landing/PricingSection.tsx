@@ -243,7 +243,7 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                                 <motion.div
                                     key={index}
                                     whileHover={shouldReduceMotion ? undefined : { y: -5 }}
-                                    className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${pkg.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10' : 'border border-border hover:border-border/80 hover:shadow-lg hover:-translate-y-1'} flex flex-col`}
+                                className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${pkg.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10' : 'border border-border hover:border-border/80 hover:shadow-lg'} flex flex-col`}
                                 >
                                     {pkg.highlight && (
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white px-3 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase">
@@ -287,7 +287,7 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
                             <motion.div
                                 key={index}
                                 whileHover={shouldReduceMotion ? undefined : { y: -5 }}
-                                className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${planItem.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10 flex flex-col' : 'border border-border hover:border-border/80 hover:-translate-y-1 hover:shadow-lg flex flex-col'}`}
+                                className={`relative group bg-card rounded-3xl p-8 transition-all duration-300 ${planItem.highlight ? 'border-2 border-brand shadow-sm transform scale-105 z-10 flex flex-col' : 'border border-border hover:border-border/80 hover:shadow-lg flex flex-col'}`}
                             >
                                 {planItem.highlight && (
                                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white px-3 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase">

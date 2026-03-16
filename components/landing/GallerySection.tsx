@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { CanvasNode } from '@/components/workspace/CanvasNode';
 import { Message } from '../../types';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 type NodeId = 'sourceA' | 'sourceB' | 'result';
 type Point = { x: number; y: number };
@@ -22,6 +23,7 @@ export const GallerySection = () => {
   const tChat = useTranslations('Chat');
   const locale = useLocale();
   const isChinese = locale === 'zh-CN';
+  const shouldReduceMotion = usePrefersReducedMotion();
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: NodeId; offsetX: number; offsetY: number } | null>(null);
@@ -291,9 +293,11 @@ export const GallerySection = () => {
                     d={`M ${line.start.x} ${line.start.y} C ${controlX} ${line.start.y}, ${controlX} ${line.end.y}, ${line.end.x} ${line.end.y}`}
                     stroke={'hsl(var(--primary))'}
                     strokeWidth={2.2}
+                    strokeDasharray={shouldReduceMotion ? undefined : '10 12'}
                     fill="none"
                     strokeLinecap="round"
                     opacity={0.92}
+                    className={shouldReduceMotion ? undefined : `gallery-link-flow gallery-link-flow-${index % 2 === 0 ? 'a' : 'b'}`}
                   />
                 );
               })}
@@ -358,7 +362,7 @@ export const GallerySection = () => {
             </div>
 
             <div
-              className="absolute pointer-events-none w-3 h-3 rounded-full border-2 bg-primary border-primary-foreground/60"
+              className={`absolute pointer-events-none w-3 h-3 rounded-full border-2 bg-primary border-primary-foreground/60 ${shouldReduceMotion ? '' : 'gallery-merge-pulse'}`}
               style={{
                 left: `${mergeAnchor.x}px`,
                 top: `${mergeAnchor.y}px`,
