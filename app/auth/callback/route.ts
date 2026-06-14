@@ -8,11 +8,19 @@ export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const authError = requestUrl.searchParams.get("error_description") || requestUrl.searchParams.get("error");
   const next = requestUrl.searchParams.get("next") ?? "/app";
   const safeNext = sanitizeNextPath(next, "/app");
 
   const redirectUrl = new URL(safeNext, requestUrl.origin);
   const response = NextResponse.redirect(redirectUrl);
+
+  if (authError) {
+    const loginUrl = new URL("/login", requestUrl.origin);
+    loginUrl.searchParams.set("error", authError);
+    logApiEvent("auth.callback.provider_error", { message: authError }, "warn");
+    return NextResponse.redirect(loginUrl);
+  }
 
   if (!code) {
     logApiEvent("auth.callback.no_code", { next: safeNext }, "warn");

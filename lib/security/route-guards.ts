@@ -23,3 +23,12 @@ export function normalizeSuccessUrl(redirectUrl: string | null, origin: string):
 export function isSupabaseAuthCookieName(name: string): boolean {
   return /^sb-[a-z0-9-]+-auth-token(?:\.\d+)?$/i.test(name);
 }
+
+export function hasSupabaseSessionCookieName(name: string): boolean {
+  return [
+    "sb-access-token",
+    "sb-refresh-token",
+    "supabase-auth-token",
+    "supabase-session-token"
+  ].includes(name) || isSupabaseAuthCookieName(name);
+}

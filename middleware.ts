@@ -1,19 +1,13 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from "next/server";
+import { hasSupabaseSessionCookieName } from "./lib/security/route-guards";
 
 const handleI18n = createMiddleware(routing);
 
-const SUPABASE_AUTH_COOKIE_NAMES = [
-  'sb-access-token',
-  'sb-refresh-token',
-  'supabase-auth-token',
-  'supabase-session-token',
-];
-
 function hasSupabaseSessionCookie(req: NextRequest): boolean {
-  for (const name of SUPABASE_AUTH_COOKIE_NAMES) {
-    if (req.cookies.get(name)) {
+  for (const cookie of req.cookies.getAll()) {
+    if (hasSupabaseSessionCookieName(cookie.name)) {
       return true;
     }
   }

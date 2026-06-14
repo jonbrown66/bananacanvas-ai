@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/routing";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, Github, Loader2, Mail, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ type AuthMode = "login" | "signup";
 export default function LoginPage() {
     const { supabase, session, isSessionLoading } = useSupabase();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const t = useTranslations('Auth');
 
     const [mode, setMode] = useState<AuthMode>("login");
@@ -31,6 +33,13 @@ export default function LoginPage() {
     useEffect(() => {
         router.prefetch("/app");
     }, [router]);
+
+    useEffect(() => {
+        const providerError = searchParams.get("error");
+        if (providerError) {
+            setError(providerError);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (!isSessionLoading && session) {

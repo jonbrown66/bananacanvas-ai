@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {
   sanitizeNextPath,
   normalizeSuccessUrl,
-  isSupabaseAuthCookieName
+  isSupabaseAuthCookieName,
+  hasSupabaseSessionCookieName
 } from "../../lib/security/route-guards.js";
 
 function run() {
@@ -26,6 +27,11 @@ function run() {
   assert.equal(isSupabaseAuthCookieName("sb-abc-auth-token"), true);
   assert.equal(isSupabaseAuthCookieName("sb-abc-auth-token.0"), true);
   assert.equal(isSupabaseAuthCookieName("session"), false);
+
+  assert.equal(hasSupabaseSessionCookieName("sb-access-token"), true);
+  assert.equal(hasSupabaseSessionCookieName("sb-demo-project-auth-token"), true);
+  assert.equal(hasSupabaseSessionCookieName("sb-demo-project-auth-token.0"), true);
+  assert.equal(hasSupabaseSessionCookieName("session"), false);
 
   console.log("security smoke checks passed");
 }
