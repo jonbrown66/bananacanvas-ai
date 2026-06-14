@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { Sidebar } from './Sidebar';
 import { Session as WorkspaceSession, ViewMode, UserProfile, Message } from '../types';
 import { Icons } from './Icons';
-import { generateOrEditImage } from '../services/geminiService';
+import { generateOrEditImage, parseImageDataUrl, type ImageMimeType } from '../services/geminiService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../lib/types';
 import { Loader2, Trash2 } from 'lucide-react';
@@ -522,12 +522,10 @@ export default function App({
 
     if (!promptText) return;
 
-    const base64 = sourceImage?.startsWith('data:image/')
-      ? sourceImage.split(',')[1]
-      : undefined;
+    const sourceImagePayload = parseImageDataUrl(sourceImage);
 
     if (targetModelId && userMessageId) {
-      handleSendMessage(promptText, base64, "1:1", parentId, true, {
+      handleSendMessage(promptText, sourceImagePayload?.base64, "1:1", parentId, true, sourceImagePayload?.mimeType, {
         replaceModelMessageId: targetModelId,
         fixedUserMessageId: userMessageId,
         fixedAiPosition: targetModelPos
@@ -535,7 +533,7 @@ export default function App({
       return;
     }
 
-    handleSendMessage(promptText, base64, "1:1", parentId, true);
+    handleSendMessage(promptText, sourceImagePayload?.base64, "1:1", parentId, true, sourceImagePayload?.mimeType);
   }, [currentSession.messages, findNearestAncestorImage]);
 
   // 2. Canvas Optimization: Update Node Position
@@ -632,6 +630,7 @@ export default function App({
     aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16",
     parentId?: string,
     isContextImage: boolean = false,
+    imageMimeType: ImageMimeType = "image/png",
     regenerateOptions?: {
       replaceModelMessageId?: string;
       fixedUserMessageId?: string;
@@ -661,7 +660,7 @@ export default function App({
             project_id: currentSessionId,
             author_role: 'user',
             content: text,
-            image_url: currentImageBase64 && !isContextImage ? `data:image/png;base64,${currentImageBase64}` : null,
+            image_url: currentImageBase64 && !isContextImage ? `data:${imageMimeType};base64,${currentImageBase64}` : null,
             aspect_ratio: aspectRatio,
             parent_id: effectiveParentId || null,
             position_x: userPos.x,
@@ -682,7 +681,7 @@ export default function App({
           timestamp: userMessageRow?.created_at ? new Date(userMessageRow.created_at).getTime() : Date.now(),
           parentId: effectiveParentId,
           position: userPos,
-          imageUrl: (currentImageBase64 && !isContextImage) ? `data:image/png;base64,${currentImageBase64}` : undefined
+          imageUrl: (currentImageBase64 && !isContextImage) ? `data:${imageMimeType};base64,${currentImageBase64}` : undefined
         };
 
         const updatedMessages = [...currentSession.messages, userMsg];
@@ -772,6 +771,7 @@ export default function App({
       const response = await generateOrEditImage({
         prompt: contextualPrompt,
         base64Image: currentImageBase64,
+        imageMimeType,
         aspectRatio: aspectRatio,
         onStatusUpdate: (msg) => {
           setStatusMessage(msg);
@@ -921,7 +921,7 @@ export default function App({
 
   if (appLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="flex h-[100dvh] items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="animate-spin text-primary" size={48} />
           <p className="text-muted-foreground font-medium animate-pulse">{t('loadingWorkspace')}</p>
@@ -932,7 +932,7 @@ export default function App({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex h-[100dvh] overflow-hidden bg-background">
         <Sidebar
           isOpen={sidebarOpen}
           viewMode={viewMode}
@@ -1067,7 +1067,12 @@ export default function App({
               top: `${Math.min(Math.max(8, pendingDelete.y + 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - 120)}px`
             }}
           >
-            <div className="rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-xl p-3">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="确认删除"
+              className="rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-xl p-3"
+            >
               <div className="min-w-0">
                 <p className="text-xs font-medium text-foreground">
                   请确认是否删除？

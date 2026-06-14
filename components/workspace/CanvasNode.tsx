@@ -167,7 +167,8 @@ export const CanvasNode = memo(({
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
-                                        className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground node-menu-trigger"
+                                        aria-label="Open node actions"
+                                        className="min-h-9 min-w-9 p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground node-menu-trigger"
                                     >
                                         <Icons.More size={16} />
                                     </button>

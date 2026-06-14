@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "check:pm": "node scripts/check-package-manager.cjs",
-    "dev": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('dev'));\"",
-    "build": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('build'));\"",
+    "dev": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('dev',process.argv.slice(1)));\"",
+    "build": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('build',process.argv.slice(1)));\"",
     "test:security": "node tests/security/route-guards.smoke.mjs",
-    "start": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('start'));\"",
-    "lint": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('lint'));\"",
+    "test:scripts": "node tests/scripts/run-next.smoke.cjs",
+    "start": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('start',process.argv.slice(1)));\"",
+    "lint": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));process.exit(require(p.join(r,'scripts','run-next.cjs'))('lint',process.argv.slice(1)));\"",
     "predev": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\"",
-    "prebuild": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\"",
-    "prestart": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\""
+    "prebuild": "node -e \"const p=require('node:path');const r=p.dirname(process.env.npm_package_json||p.join(process.cwd(),'package.json'));require(p.join(r,'scripts','ensure-next-cjs.cjs'));\""
   },
   "dependencies": {
     "@creem_io/nextjs": "^0.4.0",

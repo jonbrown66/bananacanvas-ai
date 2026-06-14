@@ -15,10 +15,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { parseImageDataUrl, resizeImageDataUrl, type ImageMimeType } from '@/services/geminiService';
 
 interface ChatWorkspaceProps {
   messages: Message[];
-  onSendMessage: (text: string, currentImageBase64?: string, aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16", parentId?: string, isContextImage?: boolean) => void | Promise<void>;
+  onSendMessage: (text: string, currentImageBase64?: string, aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16", parentId?: string, isContextImage?: boolean, imageMimeType?: ImageMimeType) => void | Promise<void>;
   isProcessing: boolean;
   onDeleteMessage: (id: string, anchor?: { x: number; y: number }) => void | Promise<void>;
   onRegenerateMessage: (msg: Message) => void;
@@ -103,8 +104,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
+      reader.onloadend = async () => {
+        const rawDataUrl = reader.result as string;
+        const optimizedDataUrl = await resizeImageDataUrl(rawDataUrl);
+        setUploadedImage(optimizedDataUrl);
         // Clear active selection when uploading new file
         setActiveMessageId(null);
       };
@@ -136,15 +139,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     e?.preventDefault();
     if (!inputValue.trim() || isProcessing) return;
 
-    const base64 = activeImage ? activeImage.split(',')[1] : undefined;
+    const imagePayload = parseImageDataUrl(activeImage);
     const targetRatio = getBestAspectRatio();
 
     // Determine if it is context image or uploaded image
     // If uploadedImage is present, it's NOT context (it's user provided)
     // If uploadedImage is null but base64 exists, it comes from history context
-    const isContextImage = !uploadedImage && !!base64;
+    const isContextImage = !uploadedImage && !!imagePayload?.base64;
 
-    onSendMessage(inputValue, base64, targetRatio, undefined, isContextImage);
+    onSendMessage(inputValue, imagePayload?.base64, targetRatio, undefined, isContextImage, imagePayload?.mimeType);
     setInputValue('');
     clearUpload();
     // Do not reset aspect ratio, keep user preference
@@ -184,7 +187,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-full lg:h-full relative z-10">
 
         {/* Messages List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar [content-visibility:auto]">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
@@ -236,7 +239,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               <div className="w-12 h-12 rounded bg-muted overflow-hidden">
                 <img src={uploadedImage} alt="Upload" className="w-full h-full object-cover" decoding="async" />
               </div>
-              <button onClick={clearUpload} className="p-1 hover:bg-muted rounded-full text-muted-foreground">
+              <button onClick={clearUpload} aria-label="Clear upload" className="p-2 hover:bg-muted rounded-full text-muted-foreground">
                 <Icons.SidebarClose size={14} className="rotate-45" />
               </button>
             </div>
@@ -258,7 +261,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={triggerFileUpload}
-                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                    aria-label={t('uploadImage')}
+                    className="min-h-11 min-w-11 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                   >
                     <Icons.New size={20} />
                   </button>
@@ -275,7 +279,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="flex items-center gap-1 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                        aria-label={t('aspectRatio')}
+                        className="min-h-11 flex items-center gap-1 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                       >
                         {ASPECT_RATIOS.find(r => r.value === selectedRatio)?.icon}
                         <span className="text-xs font-medium w-8 truncate">{selectedRatio === 'Auto' ? t('ratioAuto') : selectedRatio}</span>
@@ -316,6 +321,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             />
             <button
               type="submit"
+              aria-label={t('sending')}
               disabled={!inputValue.trim() || isProcessing}
               className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
             >

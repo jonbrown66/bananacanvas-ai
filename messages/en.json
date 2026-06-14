@@ -1,7 +1,7 @@
 {
     "Landing": {
         "heroTitle": "Say it. See it.",
-        "heroSubtitle": "The AI-powered workspace for creative minds. Generate, edit, and organize your visual assets on an infinite canvas.",
+        "heroSubtitle": "The AI-powered workspace for creative minds. Generate, edit, and organize your visual asset on an infinite canvas.",
         "getStarted": "Get Started",
         "signIn": "Sign In",
         "features": "Features",
@@ -160,6 +160,34 @@
             "bestForPower": "Best for power users",
             "designedForTeams": "Designed for teams"
         }
+    },
+    "Errors": {
+        "notFound": "Page Not Found",
+        "notFoundDesc": "Could not find the requested resource. It might have been moved or deleted.",
+        "returnHome": "Return Home",
+        "somethingWentWrong": "Something went wrong!",
+        "errorDesc": "We apologize for the inconvenience. An unexpected error has occurred.",
+        "goHome": "Go Home",
+        "tryAgain": "Try again"
+    },
+    "Contact": {
+        "title": "Contact",
+        "subtitle": "We'll help you find the right plan for your business",
+        "backToHome": "Back to Home",
+        "contactFormTitle": "Contact Us",
+        "contactFormDesc": "If you have any questions or feedback, please reach out to our team",
+        "nameLabel": "Name",
+        "namePlaceholder": "Your name",
+        "emailLabel": "Email",
+        "emailPlaceholder": "you@example.com",
+        "messageLabel": "Message",
+        "messagePlaceholder": "How can we help?",
+        "submit": "Submit",
+        "sending": "Sending...",
+        "messageSent": "Message Sent!",
+        "messageSentDesc": "We'll get back to you as soon as possible.",
+        "sendAgain": "Send another message",
+        "somethingWentWrong": "Something went wrong. Please try again later."
     },
     "LandingPage": {
         "Features": {

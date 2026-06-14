@@ -93,12 +93,13 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                         </div>
 
                         {/* Side Actions (Fade In) */}
-                        <div className="flex flex-col gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="flex flex-col gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity duration-200">
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <button
                                         onClick={(e) => onDownload(e, msg.imageUrl!)}
-                                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-foreground shadow-sm transition-all"
+                                        aria-label={t('download')}
+                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-foreground shadow-sm transition-all"
                                     >
                                         <Icons.Download size={14} />
                                     </button>
@@ -111,7 +112,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                                 <TooltipTrigger asChild>
                                     <button
                                         onClick={(e) => onRegenerate(e, msg)}
-                                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-blue-600 shadow-sm transition-all"
+                                        aria-label={t('regenerate')}
+                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-blue-600 shadow-sm transition-all"
                                     >
                                         <Icons.Regenerate size={14} />
                                     </button>
@@ -124,7 +126,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                                 <TooltipTrigger asChild>
                                     <button
                                         onClick={(e) => onDelete(e, msg.id)}
-                                        className="p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-destructive shadow-sm transition-all"
+                                        aria-label={t('delete')}
+                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-destructive shadow-sm transition-all"
                                     >
                                         <Icons.Trash size={14} />
                                     </button>

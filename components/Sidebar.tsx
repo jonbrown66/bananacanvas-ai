@@ -109,7 +109,7 @@ export const Sidebar = memo(({
 
   if (!isOpen) {
     return (
-      <div className="w-14 h-screen bg-muted/30 border-r border-border flex flex-col items-center py-4 gap-3 shadow-sm">
+      <div className="w-14 h-[100dvh] bg-muted/30 border-r border-border flex flex-col items-center py-4 gap-3 shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -206,7 +206,7 @@ export const Sidebar = memo(({
   }
 
   return (
-    <div className="w-64 h-screen bg-muted/30 border-r border-border flex flex-col flex-shrink-0 transition-all duration-300">
+    <div className="w-64 h-[100dvh] bg-muted/30 border-r border-border flex flex-col flex-shrink-0 transition-all duration-300">
       <div className="p-4 flex items-center justify-between border-b border-border">
         <Tooltip>
           <TooltipTrigger asChild>

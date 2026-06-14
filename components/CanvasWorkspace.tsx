@@ -10,10 +10,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { reportClientMetric } from '@/lib/perf/client-metrics';
+import { parseImageDataUrl, resizeImageDataUrl, type ImageMimeType } from '@/services/geminiService';
 
 interface CanvasWorkspaceProps {
   messages: Message[];
-  onSendMessage: (text: string, currentImageBase64?: string, aspectRatio?: any, parentId?: string, isContextImage?: boolean) => void | Promise<void>;
+  onSendMessage: (text: string, currentImageBase64?: string, aspectRatio?: any, parentId?: string, isContextImage?: boolean, imageMimeType?: ImageMimeType) => void | Promise<void>;
   onUpdateNodePosition: (id: string, pos: { x: number, y: number }) => void | Promise<void>;
   onAutoLayout: (positions: Record<string, { x: number, y: number }>) => void | Promise<void>;
   isProcessing: boolean;
@@ -500,8 +501,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
+      reader.onloadend = async () => {
+        const rawDataUrl = reader.result as string;
+        const optimizedDataUrl = await resizeImageDataUrl(rawDataUrl);
+        setUploadedImage(optimizedDataUrl);
       };
       reader.readAsDataURL(file);
     }
@@ -522,11 +525,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     // Priority: Uploaded Image > Selected Node Image
     const imageToUse = uploadedImage || selectedMessage?.imageUrl;
-    const base64 = imageToUse ? imageToUse.split(',')[1] : undefined;
+    const imagePayload = parseImageDataUrl(imageToUse);
 
-    const isContextImage = !uploadedImage && !!base64;
+    const isContextImage = !uploadedImage && !!imagePayload?.base64;
 
-    onSendMessage(promptInput, base64, "1:1", selectedNodeId || undefined, isContextImage);
+    onSendMessage(promptInput, imagePayload?.base64, "1:1", selectedNodeId || undefined, isContextImage, imagePayload?.mimeType);
     setPromptInput('');
     clearUpload();
   };
@@ -656,14 +659,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         })}
       </div>
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[600px] max-w-[90%] node-interactive cursor-auto" onMouseDown={e => e.stopPropagation()}>
+      <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 w-[min(600px,calc(100%_-_1rem))] node-interactive cursor-auto" onMouseDown={e => e.stopPropagation()}>
         {/* Upload Preview */}
         {uploadedImage && (
           <div className="absolute bottom-full left-0 mb-2 p-2 bg-background/90 backdrop-blur rounded-lg border border-border shadow-lg flex items-center gap-2">
             <div className="w-12 h-12 rounded bg-muted overflow-hidden">
               <img src={uploadedImage} alt="Upload" className="w-full h-full object-cover" decoding="async" />
             </div>
-            <button onClick={clearUpload} className="p-1 hover:bg-muted rounded-full text-muted-foreground">
+            <button onClick={clearUpload} aria-label="Clear upload" className="p-2 hover:bg-muted rounded-full text-muted-foreground">
               <Icons.SidebarClose size={14} className="rotate-45" />
             </button>
           </div>
@@ -686,7 +689,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={triggerFileUpload}
-                className="p-3 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-xl transition-colors"
+                aria-label={tChat('uploadImage')}
+                className="min-h-11 min-w-11 p-3 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-xl transition-colors"
               >
                 <Icons.New size={20} />
               </button>
@@ -717,8 +721,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           </div>
           <button
             type="submit"
+            aria-label={tChat('sending')}
             disabled={!promptInput.trim() || isProcessing}
-            className="bg-primary text-primary-foreground p-3.5 rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 shadow-md hover:scale-105 active:scale-95"
+            className="min-h-11 min-w-11 bg-primary text-primary-foreground p-3.5 rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 shadow-md hover:scale-105 active:scale-95"
           >
             <Icons.Send size={20} />
           </button>
@@ -727,7 +732,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
       {/* Right Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 node-interactive">
-        <button onClick={() => setScale(0.8)} className="bg-card p-2 rounded-lg shadow-md border border-border hover:bg-muted text-muted-foreground font-mono text-xs">
+        <button onClick={() => setScale(0.8)} aria-label="Reset zoom" className="min-h-11 min-w-11 bg-card p-2 rounded-lg shadow-md border border-border hover:bg-muted text-muted-foreground font-mono text-xs">
           {Math.round(scale * 100)}%
         </button>
       </div>
@@ -738,7 +743,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           <TooltipTrigger asChild>
             <button
               onClick={performAutoLayout}
-              className="bg-card p-3 rounded-full shadow-lg border border-border hover:bg-primary/10 hover:text-primary text-muted-foreground transition-all"
+              aria-label={t('autoLayout')}
+              className="min-h-11 min-w-11 bg-card p-3 rounded-full shadow-lg border border-border hover:bg-primary/10 hover:text-primary text-muted-foreground transition-all"
             >
               <Icons.AutoLayout size={20} />
             </button>

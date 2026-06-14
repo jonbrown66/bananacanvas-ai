@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
         const { data, error } = await resend.emails.send({
             from: 'BananaCanvas Contact <onboarding@resend.dev>',
-            to: ['xinjunbang@gmail.com'],
+            to: [process.env.CONTACT_EMAIL || 'xinjunbang@gmail.com'],
             subject: `New Contact Form Submission from ${escapeHtml(name)}`,
             html: `
         <h2>New Contact Form Submission</h2>

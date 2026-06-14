@@ -89,8 +89,8 @@ async function handleCheckout(request: NextRequest) {
         url.searchParams.set('referenceId', user.id);
 
         // SDK expects 'successUrl' not 'redirectUrl' - map it
-        const safeSuccessUrl = normalizeSuccessUrl(redirectUrl, url.origin);
-        if (redirectUrl && !safeSuccessUrl) {
+        const safeSuccessUrl = normalizeSuccessUrl(redirectUrl ?? null, url.origin);
+        if ((redirectUrl ?? null) && !safeSuccessUrl) {
             logApiEvent("checkout.invalid_redirect", { redirectUrl }, "warn");
             return NextResponse.json({ error: "Invalid redirect URL" }, { status: 400 });
         }

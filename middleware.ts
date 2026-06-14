@@ -1,45 +1,52 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from "next/server";
-import { isSupabaseAuthCookieName } from "@/lib/security/route-guards";
 
 const handleI18n = createMiddleware(routing);
 
-function hasSupabaseSessionCookie(req: NextRequest) {
-  return req.cookies.getAll().some((cookie) => isSupabaseAuthCookieName(cookie.name));
+const SUPABASE_AUTH_COOKIE_NAMES = [
+  'sb-access-token',
+  'sb-refresh-token',
+  'supabase-auth-token',
+  'supabase-session-token',
+];
+
+function hasSupabaseSessionCookie(req: NextRequest): boolean {
+  for (const name of SUPABASE_AUTH_COOKIE_NAMES) {
+    if (req.cookies.get(name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function middleware(req: NextRequest) {
-  // Apply i18n
-  const res = handleI18n(req);
-
   const pathname = req.nextUrl.pathname;
+  const segments = pathname.split('/');
+  const firstSegment = segments[1];
+  const isLocalePrefixed = firstSegment === 'en' || firstSegment === 'zh-CN';
 
-  // If next-intl redirects, return immediately
-  if (res.headers.get('Location')) {
-    return res;
+  const isAppRoute = segments.includes('app');
+
+  if (isAppRoute) {
+    const hasSession = hasSupabaseSessionCookie(req);
+    if (!hasSession) {
+      const locale = isLocalePrefixed ? firstSegment : 'en';
+      const url = req.nextUrl.clone();
+      url.pathname = `/${locale}/login`;
+      return NextResponse.redirect(url);
+    }
   }
 
-  // Check authentication for /app routes
-  // segments.includes('app') is a simple way to check if this is an app-related route
-  const segments = pathname.split('/');
-  const isAppRoute = segments.includes('app');
-  const hasSession = hasSupabaseSessionCookie(req);
+  const res = handleI18n(req);
 
-  if (isAppRoute && !hasSession) {
-    // Redirect to login if accessing app route while unauthenticated
-    const locale = segments.find(s => s === 'en' || s === 'zh-CN') || 'en';
-    const url = req.nextUrl.clone();
-    url.pathname = `/${locale}/login`;
-    return NextResponse.redirect(url);
+  if (res.headers.get('Location')) {
+    return res;
   }
 
   return res;
 }
 
 export const config = {
-  // Match all pathnames except for
-  // - … if they start with `/api`, `/_next` or `/_vercel`
-  // - … the ones containing a dot (e.g. `favicon.ico`)
   matcher: ['/((?!api|auth|_next|_vercel|.*\\..*).*)']
 };
