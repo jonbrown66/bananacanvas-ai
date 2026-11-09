@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { useTranslations } from 'next-intl';
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { User, Shield, Wallet } from "lucide-react";
@@ -83,63 +84,64 @@ export function SettingsWorkspace({ onNavigate }: { onNavigate?: (sessionId: str
                     <p className="text-sm text-muted-foreground">{t('managePreferences')}</p>
                 </div>
 
-                <div className="flex items-center p-1 bg-muted/50 rounded-full border border-border">
-                    <button
-                        onClick={() => setActiveTab("profile")}
-                        className={cn(
-                            "flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all",
-                            activeTab === "profile"
-                                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}
-                    >
-                        <User size={16} /> {t('profile')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("security")}
-                        className={cn(
-                            "flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all",
-                            activeTab === "security"
-                                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}
-                    >
-                        <Shield size={16} /> {t('security')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("billing")}
-                        className={cn(
-                            "flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all",
-                            activeTab === "billing"
-                                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}
-                    >
-                        <Wallet size={16} /> {t('billing')}
-                    </button>
+                <div className="flex items-center p-1 bg-muted/60 rounded-full border border-border relative">
+                    {(["profile", "security", "billing"] as const).map((tab) => {
+                        const isActive = activeTab === tab;
+                        const icon = tab === "profile" ? <User size={16} /> : tab === "security" ? <Shield size={16} /> : <Wallet size={16} />;
+                        return (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className="relative flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors z-10 active:scale-95"
+                            >
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="settingsTabActivePill"
+                                        transition={{ type: "spring", stiffness: 480, damping: 35 }}
+                                        className="absolute inset-0 bg-background rounded-full shadow-sm ring-1 ring-border"
+                                    />
+                                )}
+                                <span className={`relative z-20 flex items-center gap-2 transition-colors ${
+                                    isActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+                                }`}>
+                                    {icon} {t(tab)}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Content Area */}
             <div className="w-full max-w-3xl flex-1 overflow-y-auto pb-10">
-                {activeTab === "profile" && (
-                    <ProfileTab
-                        initialName={displayName}
-                        initialAvatar={avatarUrl}
-                        onUpdate={handleProfileUpdate}
-                    />
-                )}
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.16, ease: "easeOut" }}
+                    >
+                        {activeTab === "profile" && (
+                            <ProfileTab
+                                initialName={displayName}
+                                initialAvatar={avatarUrl}
+                                onUpdate={handleProfileUpdate}
+                            />
+                        )}
 
-                {activeTab === "security" && (
-                    <SecurityTab />
-                )}
+                        {activeTab === "security" && (
+                            <SecurityTab />
+                        )}
 
-                {activeTab === "billing" && (
-                    <BillingTab
-                        billingProfile={billingProfile}
-                        onNavigate={onNavigate}
-                    />
-                )}
+                        {activeTab === "billing" && (
+                            <BillingTab
+                                billingProfile={billingProfile}
+                                onNavigate={onNavigate}
+                            />
+                        )}
+                    </motion.div>
+                </AnimatePresence>
             </div>
         </div>
     );

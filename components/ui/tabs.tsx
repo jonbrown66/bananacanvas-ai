@@ -15,7 +15,7 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 const TabsTrigger = ({ className, ...props }: TabsPrimitive.TabsTriggerProps) => (
   <TabsPrimitive.Trigger
     className={cn(
-      "inline-flex min-w-[120px] items-center justify-center rounded-md px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+      "inline-flex min-w-[120px] items-center justify-center rounded-md px-3 py-2 text-sm font-medium ring-offset-background transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
       className
     )}
     {...props}

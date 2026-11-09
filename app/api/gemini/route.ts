@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { logApiEvent } from "@/lib/observability";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { uploadWorkspaceImage } from "@/lib/server/image-storage";
 
 const MODEL = "gemini-3.1-flash-image-preview";
 const CREDIT_COST = 10;
@@ -12,6 +13,7 @@ const MAX_PROMPT_LENGTH = 2000;
 const MAX_BASE64_LENGTH = 8_000_000;
 const MAX_REQUESTS_PER_WINDOW = 6;
 const MAX_CONCURRENT_REQUESTS_PER_USER = 2;
+const GENERIC_GENERATION_ERROR = "Image generation failed. Please try again.";
 
 const activeRequestMap = new Map<string, number>();
 
@@ -268,9 +270,6 @@ export async function POST(req: Request) {
         },
       },
     });
-    shouldRefund = false;
-    logApiEvent("gemini.success", { userId: user.id, model: MODEL });
-
     const inlineBase64 =
       response?.data ||
       response?.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)
@@ -284,11 +283,22 @@ export async function POST(req: Request) {
         ?.join("") ||
       "";
 
+    const uploadedImage = inlineBase64
+      ? await uploadWorkspaceImage({
+          userId: user.id,
+          base64: inlineBase64,
+          mimeType: "image/png",
+          source: "generation"
+        })
+      : null;
+
+    shouldRefund = false;
+    logApiEvent("gemini.success", { userId: user.id, model: MODEL });
+
     return NextResponse.json({
       text: text || undefined,
-      imageUrl: inlineBase64
-        ? `data:image/png;base64,${inlineBase64}`
-        : undefined,
+      imageUrl: uploadedImage?.imageUrl,
+      storagePath: uploadedImage?.storagePath
     });
   } catch (error: any) {
     if (shouldRefund && userId && supabaseAdmin) {
@@ -307,10 +317,7 @@ export async function POST(req: Request) {
 
     console.error("Gemini API error:", error);
     logApiEvent("gemini.failed", { userId, message: error?.message }, "error");
-    return NextResponse.json(
-      { error: error?.message || "Gemini API call failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: GENERIC_GENERATION_ERROR }, { status: 500 });
   } finally {
     if (slotAcquired && userId) {
       releaseUserSlot(userId);

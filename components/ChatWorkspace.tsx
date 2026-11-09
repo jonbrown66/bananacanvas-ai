@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { useTranslations, useLocale } from 'next-intl';
 import { Icons } from './Icons';
 import { Message, PromptSuggestion } from '../types';
@@ -15,7 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { parseImageDataUrl, resizeImageDataUrl, type ImageMimeType } from '@/services/geminiService';
+import { resolveImagePayload, resizeImageDataUrl, type ImageMimeType } from '@/services/geminiService';
 
 interface ChatWorkspaceProps {
   messages: Message[];
@@ -69,11 +70,38 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const isNearBottomRef = useRef(true);
 
-  // When messages change (new one added) or processing starts, scroll to bottom
+  // Auto-scroll only while the user is already near the bottom: generation
+  // status updates change `messages` identity repeatedly, and unconditional
+  // smooth scrolling used to yank the user back down while reading history.
   useEffect(() => {
+    if (!isNearBottomRef.current) {
+      setShowJumpToLatest(true);
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isProcessing]);
+  }, [messages.length, isProcessing]);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      isNearBottomRef.current = nearBottom;
+      if (nearBottom) setShowJumpToLatest(false);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const jumpToLatest = () => {
+    isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   // When latestImage changes (new generation), automatically select it
   useEffect(() => {
@@ -135,11 +163,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const activeImage = getActiveImage();
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim() || isProcessing) return;
 
-    const imagePayload = parseImageDataUrl(activeImage);
+    const imagePayload = await resolveImagePayload(activeImage);
     const targetRatio = getBestAspectRatio();
 
     // Determine if it is context image or uploaded image
@@ -187,7 +215,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-background h-full lg:h-full relative z-10">
 
         {/* Messages List */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar [content-visibility:auto]">
+        <div ref={scrollContainerRef} className="relative flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar [content-visibility:auto]">
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
@@ -228,6 +256,20 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             </div>
           )}
           <div ref={messagesEndRef} />
+
+          {/* Jump-to-latest pill: shown when the user scrolled up during generation */}
+          {showJumpToLatest && (
+            <div className="sticky bottom-2 flex justify-center pointer-events-none">
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                className="pointer-events-auto h-8 px-3 rounded-full bg-background/95 border border-border shadow-md text-xs font-medium text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Icons.Chat size={12} />
+                {t('jumpToLatest')}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
@@ -255,16 +297,16 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             />
 
             {/* Left Tools */}
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={triggerFileUpload}
                     aria-label={t('uploadImage')}
-                    className="min-h-11 min-w-11 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95 transition-all shrink-0"
                   >
-                    <Icons.New size={20} />
+                    <Icons.New size={18} className="shrink-0" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -280,10 +322,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                       <button
                         type="button"
                         aria-label={t('aspectRatio')}
-                        className="min-h-11 flex items-center gap-1 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                        className="h-9 px-2.5 rounded-lg flex items-center gap-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95 transition-all shrink-0"
                       >
                         {ASPECT_RATIOS.find(r => r.value === selectedRatio)?.icon}
-                        <span className="text-xs font-medium w-8 truncate">{selectedRatio === 'Auto' ? t('ratioAuto') : selectedRatio}</span>
+                        <span className="text-xs font-medium w-7 truncate text-left">{selectedRatio === 'Auto' ? t('ratioAuto') : selectedRatio}</span>
                       </button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
@@ -310,22 +352,21 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               </DropdownMenu>
             </div>
 
-
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={uploadedImage ? t('describeChange') : (activeImage ? t('describeEdit') : t('describeGenerate'))}
-              className="w-full pl-36 pr-12 py-4 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground placeholder-muted-foreground shadow-inner"
+              className="w-full pl-32 pr-12 py-3.5 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground placeholder-muted-foreground text-sm shadow-inner"
               disabled={isProcessing}
             />
             <button
               type="submit"
               aria-label={t('sending')}
               disabled={!inputValue.trim() || isProcessing}
-              className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed active:scale-90 transition-all shrink-0 shadow-sm"
             >
-              <Icons.Send size={18} />
+              <Icons.Send size={16} className="shrink-0" />
             </button>
           </form>
         </div>
@@ -341,40 +382,56 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           </h3>
           {/* We ref this container to determine aspects */}
           <div ref={previewRef} className="flex-1 flex items-center justify-center overflow-hidden relative group p-4">
-            {activeImage ? (
-              <div className="relative w-full h-full max-w-[90%] max-h-[90%] flex items-center justify-center">
-                {/* Use img with max bounds to preserve natural aspect ratio and avoid layout jump. */}
-                <img
-                  src={activeImage}
-                  alt="Active workspace"
-                  className="max-w-full max-h-full rounded-xl shadow-md border border-border object-contain transition-transform duration-300 hover:scale-[1.01]"
-                  decoding="async"
-                />
-              </div>
-            ) : (
-              <div className="w-full h-full max-w-[90%] max-h-[90%] bg-muted/30 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-center text-muted-foreground transition-all">
-                <Icons.Image size={44} className="mx-auto mb-3 opacity-40" />
-                <span className="text-xs">{t('noImageSelected')}</span>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {activeImage ? (
+                <motion.div
+                  key={activeImage}
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="relative w-full h-full max-w-[90%] max-h-[90%] flex items-center justify-center"
+                >
+                  <div className="relative max-w-full max-h-full rounded-2xl overflow-hidden shadow-lg border border-border/80 bg-background flex items-center justify-center">
+                    <img
+                      src={activeImage}
+                      alt="Active workspace"
+                      className="max-w-full max-h-full object-contain transition-transform duration-300 hover:scale-[1.01]"
+                      decoding="async"
+                    />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty-preview"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="w-full h-full max-w-[90%] max-h-[90%] bg-muted/20 rounded-2xl border-2 border-dashed border-border/80 flex flex-col items-center justify-center text-center text-muted-foreground transition-all"
+                >
+                  <Icons.Image size={44} className="mx-auto mb-3 opacity-40" />
+                  <span className="text-xs">{t('noImageSelected')}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
         {/* Bottom: Quick Prompts */}
-        <div className="h-auto flex-shrink-0 border-t border-border p-6 bg-card">
-          <h3 className="text-foreground font-medium mb-4 flex items-center gap-2">
-            <Icons.Magic size={18} />
+        <div className="h-auto flex-shrink-0 border-t border-border p-5 bg-card">
+          <h3 className="text-foreground font-semibold text-sm mb-3 flex items-center gap-2">
+            <Icons.Magic size={16} className="text-primary" />
             {t('quickActions')}
           </h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {SUGGESTIONS.map((sug) => (
               <button
                 key={sug.id}
                 onClick={() => setInputValue(sug.prompt)}
-                className="text-left p-2.5 rounded-lg bg-muted/50 hover:bg-primary/10 border border-border hover:border-primary/20 transition-all group"
+                className="text-left p-3 rounded-xl bg-muted/30 hover:bg-muted/70 border border-border/60 hover:border-border transition-all duration-150 hover:-translate-y-0.5 hover:shadow-sm active:scale-[0.98] group"
               >
-                <span className="block text-xs font-semibold text-foreground group-hover:text-primary">{sug.label}</span>
-                <span className="block text-[10px] text-muted-foreground truncate group-hover:text-primary/80">{sug.prompt}</span>
+                <span className="block text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{sug.label}</span>
+                <span className="block text-[11px] text-muted-foreground truncate group-hover:text-foreground/80 mt-0.5">{sug.prompt}</span>
               </button>
             ))}
           </div>

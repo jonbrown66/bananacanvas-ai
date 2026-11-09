@@ -93,6 +93,15 @@ export async function checkRateLimit(options: RateLimitOptions): Promise<RateLim
     try {
       return await checkRedisLimit(options, redis.url, redis.token);
     } catch {
+      if (process.env.NODE_ENV === "production") {
+        return {
+          allowed: false,
+          count: options.limit + 1,
+          remaining: 0,
+          windowSeconds: options.windowSeconds,
+          source: "redis"
+        };
+      }
       return checkMemoryLimit(options);
     }
   }

@@ -5,13 +5,17 @@ const withNextIntl = createNextIntlPlugin();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ['@supabase/supabase-js', '@supabase/ssr'],
   devIndicators: {
+    appIsrStatus: false,
     buildActivity: false,
   },
   experimental: {
     //typedRoutes: true
   },
   images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 2678400,
     remotePatterns: [
       {
         protocol: 'https',

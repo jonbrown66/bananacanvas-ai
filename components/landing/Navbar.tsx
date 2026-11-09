@@ -7,7 +7,7 @@ import { Menu, X } from 'lucide-react';
 import { LandingThemeToggle } from "@/components/landing-theme-toggle";
 import { useTranslations } from 'next-intl';
 import { LanguageSwitcher } from '../LanguageSwitcher';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export const Navbar = () => {
@@ -117,15 +117,20 @@ export const Navbar = () => {
                     <div className="h-4 w-px bg-border mx-2"></div>
                     <Link
                         href="/login"
-                        className="bg-foreground text-background px-6 py-2 rounded-full font-medium text-sm transition-all hover:bg-foreground/90 active:scale-95"
+                        className="inline-flex items-center justify-center bg-foreground text-background px-5 py-2 rounded-full font-medium text-sm transition-all hover:bg-foreground/90 active:scale-95 shadow-sm"
                     >
                         {t('getStarted')}
                     </Link>
                 </div>
 
                 {/* Mobile Menu Toggle */}
-                <button className="md:hidden p-2 text-muted-foreground hover:text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                    {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                <button
+                    type="button"
+                    aria-label="Toggle navigation menu"
+                    className="md:hidden w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95 transition-all shrink-0"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                >
+                    {mobileMenuOpen ? <X size={22} className="shrink-0" /> : <Menu size={22} className="shrink-0" />}
                 </button>
             </div>
 

@@ -4,36 +4,41 @@ import React from 'react';
 import { Layout, Zap, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
-import { motion } from 'framer-motion';
+import { m as motion, type Variants } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export const FeaturesSection = () => {
   const t = useTranslations('LandingPage.Features');
   const shouldReduceMotion = usePrefersReducedMotion();
+  const { resolvedTheme } = useTheme();
+  // Hydration-safe: default to light on SSR, swap after mount.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === 'dark';
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
+  const containerVariants: Variants = {
+    hidden: { opacity: 0.85 },
     visible: {
       opacity: 1,
       transition: {
         staggerChildren: shouldReduceMotion ? 0 : 0.08,
-        delayChildren: shouldReduceMotion ? 0 : 0.08
+        delayChildren: shouldReduceMotion ? 0 : 0.04
       }
     }
   };
 
-  const itemVariants = shouldReduceMotion
+  const itemVariants: Variants = shouldReduceMotion
     ? {
-      hidden: { opacity: 0 },
+      hidden: { opacity: 1 },
       visible: { opacity: 1, transition: { duration: 0.12 } }
     }
     : {
-      hidden: { opacity: 0, y: 22, scale: 0.98 },
+      hidden: { opacity: 0.85, y: 14 },
       visible: {
         opacity: 1,
         y: 0,
-        scale: 1,
-        transition: { type: 'spring' as const, stiffness: 120, damping: 20 }
+        transition: { duration: 0.45, ease: "easeOut" }
       }
     };
 
@@ -63,7 +68,7 @@ export const FeaturesSection = () => {
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: '-100px' }}
+          viewport={{ once: true, amount: 0.05 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]"
         >
           <motion.div
@@ -83,19 +88,14 @@ export const FeaturesSection = () => {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(249,115,22,0.05),transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
             <div className="absolute bottom-[-20px] right-[-20px] w-[85%] h-auto z-10 transition-transform duration-500 group-hover:scale-[1.02]">
+              {/* Below the fold: lazy-loaded, only the active theme's variant. */}
               <Image
-                src="/feature-canvas.png"
+                src={isDark ? "/feature-canvas-black.png" : "/feature-canvas.png"}
                 alt="Infinite Canvas Interface"
                 width={1000}
                 height={800}
-                className="w-full h-auto rounded-xl shadow-2xl border-[6px] border-background/80 ring-1 ring-border/20 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 block dark:hidden"
-              />
-              <Image
-                src="/feature-canvas-black.png"
-                alt="Infinite Canvas Interface"
-                width={1000}
-                height={800}
-                className="w-full h-auto rounded-xl shadow-2xl border-[6px] border-background/80 ring-1 ring-border/20 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 hidden dark:block"
+                sizes="(max-width: 768px) 85vw, 600px"
+                className="w-full h-auto rounded-xl shadow-2xl border-[6px] border-background/80 ring-1 ring-border/20 rotate-[-2deg] group-hover:rotate-0 transition-all duration-500 block"
               />
             </div>
           </motion.div>

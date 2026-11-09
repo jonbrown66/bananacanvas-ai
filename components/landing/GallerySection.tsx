@@ -193,7 +193,7 @@ export const GallerySection = () => {
     };
   }, [draggingId, canvasSize.height, canvasSize.width, nodeHeights]);
 
-  const handleNodeMouseDown = (event: React.MouseEvent, id: string) => {
+  const handleNodeMouseDown = (event: React.PointerEvent, id: string) => {
     if (id !== 'sourceA' && id !== 'sourceB' && id !== 'result') return;
     event.stopPropagation();
 
@@ -322,6 +322,7 @@ export const GallerySection = () => {
                     msg={item.msg}
                     isSelected={draggingId === item.id}
                     lowDetail={false}
+                    plainText
                     isChinese={isChinese}
                     t={tCanvas}
                     tChat={tChat}
@@ -348,6 +349,7 @@ export const GallerySection = () => {
                   msg={resultMessage}
                   isSelected={draggingId === 'result'}
                   lowDetail={false}
+                  plainText
                   isChinese={isChinese}
                   t={tCanvas}
                   tChat={tChat}

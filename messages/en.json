@@ -86,6 +86,7 @@
         "download": "Download",
         "regenerate": "Regenerate",
         "delete": "Delete",
+        "jumpToLatest": "Jump to latest",
         "suggestionCyberpunk": "Cyberpunk",
         "suggestionCyberpunkPrompt": "Transform this into a cyberpunk city style with neon lights.",
         "suggestionWatercolor": "Watercolor",

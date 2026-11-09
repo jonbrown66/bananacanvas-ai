@@ -245,6 +245,6 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("[Creem Webhook] Error:", error);
     logApiEvent("creem_webhook.failed", { message: error.message }, "error");
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }

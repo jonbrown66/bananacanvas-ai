@@ -100,8 +100,8 @@ export function SecurityTab() {
 
             <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-8 space-y-4">
                 <div className="flex items-center gap-3 text-destructive">
-                    <div className="p-2 bg-destructive/10 rounded-lg">
-                        <ShieldAlert className="h-5 w-5" />
+                    <div className="w-9 h-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+                        <ShieldAlert className="h-5 w-5 shrink-0" />
                     </div>
                     <h3 className="text-lg font-medium">{t('dangerZone')}</h3>
                 </div>

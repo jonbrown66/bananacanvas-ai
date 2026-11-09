@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Twitter, Github, Linkedin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 const SOCIAL_LINKS = [

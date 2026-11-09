@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
   if (deleteError) {
     logApiEvent("auth.delete.failed", { userId: user.id, message: deleteError.message }, "error");
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    return NextResponse.json({ error: "Account deletion failed. Please try again." }, { status: 500 });
   }
 
   logApiEvent("auth.delete.success", { userId: user.id });

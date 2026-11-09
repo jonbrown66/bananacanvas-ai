@@ -44,20 +44,29 @@ function flushQueue() {
     window.__BANANA_METRICS__ = [...(window.__BANANA_METRICS__ ?? []), ...batch].slice(-300);
   }
 
-  if (navigator.sendBeacon) {
-    const blob = new Blob([text], { type: 'application/json' });
-    navigator.sendBeacon(endpoint, blob);
+  // In development, keep metrics in memory to prevent rate limiting 429 noise in dev overlay
+  if (process.env.NODE_ENV === 'development') {
     return;
   }
 
-  fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: text,
-    keepalive: true
-  }).catch(() => {
-    // Swallow telemetry send failures to avoid impacting UX.
-  });
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([text], { type: 'application/json' });
+      navigator.sendBeacon(endpoint, blob);
+      return;
+    }
+
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: text,
+      keepalive: true
+    }).catch(() => {
+      // Silently swallow telemetry send failures
+    });
+  } catch {
+    // Ignore any unexpected telemetry errors
+  }
 }
 
 function scheduleFlush() {

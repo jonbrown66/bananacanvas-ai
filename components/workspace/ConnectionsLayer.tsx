@@ -1,10 +1,12 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Message } from '../../types';
 
 interface ConnectionsLayerProps {
     messages: Message[];
     fastNodePositions: React.MutableRefObject<Record<string, { x: number, y: number }>>;
     isDragging: boolean;
+    /** Id of the node currently being dragged, so per-frame patches can target only its edges. */
+    draggingNodeId?: string | null;
     simplified?: boolean;
     maxRenderedConnections?: number;
     viewportBounds?: {
@@ -18,42 +20,65 @@ interface ConnectionsLayerProps {
 const NODE_WIDTH = 380;
 const NODE_HEADER_HEIGHT = 60;
 
+function buildPathData(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    simplified: boolean
+) {
+    const startX = start.x + NODE_WIDTH;
+    const startY = start.y + NODE_HEADER_HEIGHT;
+    const endX = end.x;
+    const endY = end.y + NODE_HEADER_HEIGHT;
+
+    const dist = Math.abs(endX - startX);
+    const controlPointOffset = Math.max(dist * 0.45, 90);
+    return simplified
+        ? `M ${startX} ${startY} L ${endX} ${endY}`
+        : `M ${startX} ${startY} C ${startX + controlPointOffset} ${startY}, ${endX - controlPointOffset} ${endY}, ${endX} ${endY}`;
+}
+
 export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
     messages,
     fastNodePositions,
     isDragging,
+    draggingNodeId,
     simplified = false,
     maxRenderedConnections = 500,
     viewportBounds
 }) => {
-    const [, setTick] = useState(0);
-    const rafRef = useRef<number | null>(null);
+    // While dragging a node, only that node's connections change every frame.
+    // Patch the affected paths' `d` attribute directly (O(degree) per frame)
+    // instead of re-rendering every <path> on a tick; a low-frequency resync
+    // keeps viewport culling roughly in sync (its margin is 180-240px).
+    const pathRefs = useRef<Map<string, SVGPathElement>>(new Map());
+    const [resyncTick, setResyncTick] = useState(0);
+    const lastResyncAt = useRef(0);
+    const draggingNodeIdRef = useRef<string | null>(draggingNodeId);
 
+    draggingNodeIdRef.current = draggingNodeId;
+
+    // Low-frequency resync loop while dragging (100ms), so culling and
+    // stroke-width changes eventually settle without per-frame React work.
     useEffect(() => {
-        if (!isDragging) {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-            return;
-        }
+        if (!isDragging) return;
 
-        const rerenderInterval = messages.length > 260 ? 50 : 33;
-        let lastRerenderAt = 0;
+        let cancelled = false;
+        let rafId: number | null = null;
         const loop = (now: number) => {
-            // Keep interaction intact while reducing heavy path recomputation frequency on large scenes.
-            if (now - lastRerenderAt >= rerenderInterval) {
-                setTick((t) => t + 1);
-                lastRerenderAt = now;
+            if (cancelled) return;
+            if (now - lastResyncAt.current >= 100) {
+                lastResyncAt.current = now;
+                setResyncTick((t) => t + 1);
             }
-            rafRef.current = requestAnimationFrame(loop);
+            rafId = requestAnimationFrame(loop);
         };
-
-        rafRef.current = requestAnimationFrame(loop);
+        rafId = requestAnimationFrame(loop);
 
         return () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
+            cancelled = true;
+            if (rafId !== null) cancelAnimationFrame(rafId);
         };
-    }, [isDragging, messages.length]);
+    }, [isDragging]);
 
     const messageMap = useMemo(() => {
         const map = new Map<string, Message>();
@@ -62,6 +87,7 @@ export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
     }, [messages]);
 
     const connectionPairs = useMemo(() => {
+        void resyncTick; // resync while dragging: recompute with fresh bounds
         const pairs: Array<{ childId: string; parentId: string }> = [];
         const isInViewport = (x: number, y: number) => {
             if (!viewportBounds) return true;
@@ -95,7 +121,44 @@ export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
         }
 
         return pairs;
-    }, [messages, messageMap, viewportBounds, fastNodePositions, maxRenderedConnections]);
+    }, [messages, messageMap, viewportBounds, fastNodePositions, maxRenderedConnections, resyncTick]);
+
+    // Per-frame direct DOM patch: rewrite only the paths touching the dragged node.
+    useEffect(() => {
+        if (!isDragging) return;
+        let rafId: number | null = null;
+
+        const patchDraggedPaths = () => {
+            const draggedId = draggingNodeIdRef.current;
+            if (!draggedId) return;
+            const draggedPos = fastNodePositions.current[draggedId];
+            if (!draggedPos) return;
+
+            for (const { childId, parentId } of connectionPairs) {
+                if (childId !== draggedId && parentId !== draggedId) continue;
+                const el = pathRefs.current.get(`conn-${childId}`);
+                if (!el) continue;
+
+                const parent = messageMap.get(parentId);
+                const child = messageMap.get(childId);
+                if (!parent || !child) continue;
+
+                const start = fastNodePositions.current[parent.id] || parent.position || { x: 0, y: 0 };
+                const end = fastNodePositions.current[child.id] || child.position || { x: 0, y: 0 };
+                el.setAttribute('d', buildPathData(start, end, simplified));
+            }
+        };
+
+        const loop = () => {
+            patchDraggedPaths();
+            rafId = requestAnimationFrame(loop);
+        };
+        rafId = requestAnimationFrame(loop);
+
+        return () => {
+            if (rafId !== null) cancelAnimationFrame(rafId);
+        };
+    }, [isDragging, connectionPairs, messageMap, fastNodePositions, simplified]);
 
     return (
         <svg className="absolute top-0 left-0 w-full h-full overflow-visible pointer-events-none z-0" aria-hidden="true">
@@ -106,21 +169,14 @@ export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
                 const start = fastNodePositions.current[parent.id] || parent.position || { x: 0, y: 0 };
                 const end = fastNodePositions.current[child.id] || child.position || { x: 0, y: 0 };
 
-                const startX = start.x + NODE_WIDTH;
-                const startY = start.y + NODE_HEADER_HEIGHT;
-                const endX = end.x;
-                const endY = end.y + NODE_HEADER_HEIGHT;
-
-                const dist = Math.abs(endX - startX);
-                const controlPointOffset = Math.max(dist * 0.45, 90);
-                const pathData = simplified
-                    ? `M ${startX} ${startY} L ${endX} ${endY}`
-                    : `M ${startX} ${startY} C ${startX + controlPointOffset} ${startY}, ${endX - controlPointOffset} ${endY}, ${endX} ${endY}`;
-
                 return (
                     <path
                         key={`conn-${childId}`}
-                        d={pathData}
+                        ref={(el) => {
+                            if (el) pathRefs.current.set(`conn-${childId}`, el);
+                            else pathRefs.current.delete(`conn-${childId}`);
+                        }}
+                        d={buildPathData(start, end, simplified)}
                         stroke="hsl(var(--border))"
                         strokeWidth={simplified ? 1.6 : (isDragging ? 2 : 2.5)}
                         fill="none"

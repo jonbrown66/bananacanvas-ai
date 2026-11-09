@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { m as motion } from 'framer-motion';
 import { Message } from '../../types';
 import { Icons } from '../Icons';
 import { cva } from 'class-variance-authority';
@@ -26,12 +27,12 @@ const bubbleVariants = cva(
 );
 
 const imageContainerVariants = cva(
-    "relative rounded-xl overflow-hidden border shadow-sm max-w-[140px] transition-all cursor-pointer",
+    "relative rounded-2xl overflow-hidden border transition-all cursor-pointer select-none max-w-[150px] bg-muted/20",
     {
         variants: {
             isActive: {
-                true: "ring-2 ring-primary border-primary",
-                false: "border-border hover:border-primary/50"
+                true: "border-primary ring-2 ring-primary/25 shadow-md",
+                false: "border-border/80 hover:border-primary/50 shadow-sm"
             }
         },
         defaultVariants: {
@@ -62,7 +63,12 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
     onDelete
 }: ChatMessageBubbleProps) {
     return (
-        <div className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+        >
             {msg.role === 'model' && (
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-ai-start to-ai-end flex-shrink-0 flex items-center justify-center text-ai-text font-bold text-xs">
                     AI
@@ -77,8 +83,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                 )}
 
                 {msg.imageUrl && (
-                    <div className="flex items-start gap-3 group">
-                        {/* Image Container */}
+                    <div className="flex items-start gap-2.5 group">
+                        {/* Image Container - Concentric 16px radius with overflow clipping */}
                         <div
                             className={cn(imageContainerVariants({ isActive }))}
                             onClick={() => onImageClick(msg.id)}
@@ -86,22 +92,23 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                             <img
                                 src={msg.imageUrl}
                                 alt="Generated"
-                                className="w-full h-auto rounded-xl object-contain"
+                                className="w-full h-auto block object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                 loading="lazy"
                                 decoding="async"
                             />
                         </div>
 
-                        {/* Side Actions (Fade In) */}
-                        <div className="flex flex-col gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity duration-200">
+                        {/* Side Actions - Integrated Glass Pill Toolbar with Concentric 12px/8px radii and perfect centering */}
+                        <div className="flex flex-col gap-0.5 p-1 bg-card/90 dark:bg-card/85 backdrop-blur-md border border-border/80 rounded-xl shadow-sm self-start opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-all duration-150">
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <button
+                                        type="button"
                                         onClick={(e) => onDownload(e, msg.imageUrl!)}
                                         aria-label={t('download')}
-                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-foreground shadow-sm transition-all"
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-90 transition-all"
                                     >
-                                        <Icons.Download size={14} />
+                                        <Icons.Download size={14} className="shrink-0" />
                                     </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">
@@ -111,11 +118,12 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <button
+                                        type="button"
                                         onClick={(e) => onRegenerate(e, msg)}
                                         aria-label={t('regenerate')}
-                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-blue-600 shadow-sm transition-all"
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 active:scale-90 transition-all"
                                     >
-                                        <Icons.Regenerate size={14} />
+                                        <Icons.Regenerate size={14} className="shrink-0" />
                                     </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">
@@ -125,11 +133,12 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <button
+                                        type="button"
                                         onClick={(e) => onDelete(e, msg.id)}
                                         aria-label={t('delete')}
-                                        className="min-h-9 min-w-9 p-1.5 bg-muted hover:bg-card border border-border rounded-full text-muted-foreground hover:text-destructive shadow-sm transition-all"
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-90 transition-all"
                                     >
-                                        <Icons.Trash size={14} />
+                                        <Icons.Trash size={14} className="shrink-0" />
                                     </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">
@@ -146,6 +155,6 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
                     U
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 });

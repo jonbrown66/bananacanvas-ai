@@ -525,3 +525,39 @@
     transition: none;
   }
 }
+
+/* One-shot arrival pop for generation results landing on the canvas. */
+@keyframes nodeArrive {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.node-arrive > div:first-child {
+  animation: nodeArrive 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: center top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-arrive > div:first-child {
+    animation: none;
+  }
+}
+
+/* Canvas nodes are focusable (a11y): replace the browser's square default
+   outline with a rounded ring that follows the card's radius. */
+.node-interactive:focus {
+  outline: none;
+}
+
+.node-interactive:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.9);
+  outline-offset: 3px;
+  border-radius: 1rem;
+}

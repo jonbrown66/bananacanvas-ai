@@ -13,14 +13,15 @@ import {
 
 import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
+import { getNodeThumbnailUrl } from '../../services/geminiService';
 
 const nodeCardVariants = cva(
-    "flex flex-col rounded-2xl border bg-card overflow-visible transition-all duration-200",
+    "flex flex-col rounded-2xl border bg-card overflow-visible transition-[border-color,box-shadow,transform] duration-200",
     {
         variants: {
             isSelected: {
-                true: "border-primary shadow-2xl ring-4 ring-primary/10 scale-[1.01]",
-                false: "border-border shadow-lg hover:border-primary/50"
+                true: "border-primary/70 shadow-[0_16px_40px_-8px_rgba(249,115,22,0.25)] ring-[3px] ring-primary/20",
+                false: "border-border/80 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08),0_12px_32px_-12px_rgba(0,0,0,0.14)] hover:border-primary/30"
             }
         },
         defaultVariants: {
@@ -34,8 +35,8 @@ const headerVariants = cva(
     {
         variants: {
             role: {
-                user: "bg-muted/50 border-border",
-                model: "bg-gradient-to-r from-ai-start/10 to-card border-ai-start/20"
+                user: "bg-muted/40 border-border/60",
+                model: "bg-gradient-to-r from-ai-start/10 via-card to-card border-ai-start/15"
             }
         },
         defaultVariants: {
@@ -45,12 +46,12 @@ const headerVariants = cva(
 );
 
 const avatarVariants = cva(
-    "w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold shadow-sm",
+    "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0",
     {
         variants: {
             role: {
-                user: "bg-card text-muted-foreground border border-border",
-                model: "bg-gradient-to-br from-ai-start to-ai-end text-ai-text"
+                user: "bg-card text-muted-foreground border border-border/80",
+                model: "bg-gradient-to-br from-ai-start to-ai-end text-ai-text shadow-[0_2px_6px_-1px_rgba(249,115,22,0.4)]"
             }
         },
         defaultVariants: {
@@ -73,7 +74,11 @@ interface CanvasNodeProps {
     tChat: any;
     nodeWidth?: number;
     isAbsolute?: boolean;
-    onMouseDown: (e: React.MouseEvent, msgId: string) => void;
+    /** One-shot pop-in when the generation result replaces its placeholder. */
+    justArrived?: boolean;
+    /** Render plain text instead of markdown — used by landing demo nodes so react-markdown stays out of the landing chunk. */
+    plainText?: boolean;
+    onMouseDown: (e: React.PointerEvent, msgId: string) => void;
     onDownload: (e: React.MouseEvent, url: string) => void;
     onRegenerate: (e: React.MouseEvent, msg: Message) => void;
     onDelete: (e: React.MouseEvent, msgId: string) => void;
@@ -88,6 +93,8 @@ export const CanvasNode = memo(({
     tChat,
     nodeWidth = 380,
     isAbsolute = true,
+    justArrived = false,
+    plainText = false,
     onMouseDown,
     onDownload,
     onRegenerate,
@@ -102,12 +109,35 @@ export const CanvasNode = memo(({
     return (
         <div
             className={cn(
-                "node-interactive transition-shadow duration-200 group",
+                "node-interactive transition-shadow duration-200 group rounded-2xl",
                 isAbsolute && "absolute",
-                isPlaceholder && "generating-glow"
+                isPlaceholder && "generating-glow",
+                justArrived && "node-arrive"
             )}
-            style={{ width: `${nodeWidth}px` }}
-            onMouseDown={(e) => onMouseDown(e, msg.id)}
+            style={{
+                width: `${nodeWidth}px`,
+                contain: 'layout style paint'
+            }}
+            role={isAbsolute ? 'button' : undefined}
+            tabIndex={isAbsolute && !isPlaceholder ? 0 : undefined}
+            aria-label={isAbsolute ? `${msg.role === 'user' ? 'Prompt' : 'Result'}: ${msg.text.slice(0, 60)}` : undefined}
+            onKeyDown={isAbsolute && !isPlaceholder ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    // Select without dragging: a synthetic pointer event with
+                    // real coordinates (keyboard events have none, and
+                    // undefined clientX would poison the drag math with NaN).
+                    onMouseDown({
+                        pointerId: -1,
+                        pointerType: 'mouse',
+                        clientX: 0,
+                        clientY: 0,
+                        stopPropagation: () => {},
+                        preventDefault: () => {}
+                    } as unknown as React.PointerEvent, msg.id);
+                }
+            } : undefined}
+            onPointerDown={(e) => onMouseDown(e, msg.id)}
         >
             {/* Layer 2: SVG spinning dashed border */}
             {isPlaceholder && (
@@ -167,10 +197,11 @@ export const CanvasNode = memo(({
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <button
+                                        type="button"
                                         aria-label="Open node actions"
-                                        className="min-h-9 min-w-9 p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground node-menu-trigger"
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground active:scale-90 transition-all node-menu-trigger shrink-0"
                                     >
-                                        <Icons.More size={16} />
+                                        <Icons.More size={16} className="shrink-0" />
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-popover/95 backdrop-blur-md shadow-lg">
@@ -232,7 +263,7 @@ export const CanvasNode = memo(({
                         <>
                             {(!msg.imageUrl || msg.role === 'user') && (
                                 <div className="text-sm text-card-foreground leading-relaxed line-clamp-6 mb-2">
-                                    {lowDetail ? (
+                                    {lowDetail || plainText ? (
                                         <span>{msg.text.slice(0, 220)}{msg.text.length > 220 ? '...' : ''}</span>
                                     ) : (
                                         <MemoMarkdown text={msg.text} />
@@ -242,10 +273,11 @@ export const CanvasNode = memo(({
 
                             {msg.imageUrl && (
                                 <div className="relative rounded-xl overflow-hidden border border-border bg-muted group-hover:shadow-md transition-shadow">
+                                    {/* 512px transform variant for canvas display; download still uses msg.imageUrl */}
                                     <img
-                                        src={msg.imageUrl}
+                                        src={getNodeThumbnailUrl(msg.imageUrl, 512) || msg.imageUrl}
                                         alt="Node content"
-                                        className="w-full h-auto object-cover max-h-[400px] pointer-events-none"
+                                        className="w-full h-auto object-cover max-h-[400px] pointer-events-none block"
                                         draggable={false}
                                         loading="lazy"
                                         decoding="async"
@@ -263,7 +295,7 @@ export const CanvasNode = memo(({
                     ) : lowDetail ? (
                         <span>...</span>
                     ) : (
-                        <span>{formattedTime}</span>
+                        <span suppressHydrationWarning>{formattedTime}</span>
                     )}
                     {isSelected && !isPlaceholder && <span className="text-orange-500 font-medium">{t('active')}</span>}
                 </div>

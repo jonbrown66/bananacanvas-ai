@@ -106,9 +106,9 @@ export function CreditHistoryDialog({ open, onOpenChange, onNavigate }: CreditHi
                                         </div>
                                         <div className="col-span-5 font-medium text-foreground flex items-center gap-2">
                                             {item.source}
-                                            {isClickable && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">View</span>}
+                                            {isClickable && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-md font-medium">View</span>}
                                         </div>
-                                        <div className={`col-span-3 text-right font-bold ${item.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                        <div className={`col-span-3 text-right font-mono font-bold ${item.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                             {item.amount > 0 ? '+' : ''}{item.amount}
                                         </div>
                                     </div>

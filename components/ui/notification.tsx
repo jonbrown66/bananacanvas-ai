@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { X, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationProps {
     message: string;

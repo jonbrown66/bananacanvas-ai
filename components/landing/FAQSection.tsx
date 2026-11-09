@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 

@@ -86,6 +86,7 @@
         "download": "下载",
         "regenerate": "重新生成",
         "delete": "删除",
+        "jumpToLatest": "回到底部",
         "suggestionCyberpunk": "赛博朋克",
         "suggestionCyberpunkPrompt": "将其转换为带有霓虹灯的赛博朋克城市风格。",
         "suggestionWatercolor": "水彩",

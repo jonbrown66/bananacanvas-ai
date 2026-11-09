@@ -126,7 +126,7 @@ async function handleCheckout(request: NextRequest) {
     } catch (error: any) {
         console.error("Checkout Error:", error);
         logApiEvent("checkout.failed", { message: error.message }, "error");
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Checkout failed. Please try again." }, { status: 500 });
     }
 }
 

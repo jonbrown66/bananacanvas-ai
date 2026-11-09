@@ -4,13 +4,21 @@ import React, { useEffect, useRef } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 
 export const HeroSection = () => {
     const t = useTranslations('Landing');
     const shouldReduceMotion = usePrefersReducedMotion();
+    const { resolvedTheme } = useTheme();
+    // SSR/hydration-safe theme pick: resolvedTheme is undefined on the server,
+    // so default to light for the first paint and swap after mount. Rendering
+    // the src directly from resolvedTheme caused hydration mismatches.
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+    const isDark = mounted && resolvedTheme === 'dark';
     const heroRef = useRef<HTMLDivElement>(null);
     const heroContentRef = useRef<HTMLDivElement>(null);
     const heroMockupRef = useRef<HTMLDivElement>(null);
@@ -57,17 +65,14 @@ export const HeroSection = () => {
             const contentTranslate = progress * 54;
             const contentScale = 1 - progress * 0.045;
 
-            const mockupOpacity = Math.max(0, 1 - progress * 1.12);
-            const mockupTranslate = progress * 44;
-            const mockupScale = 1 - progress * 0.04;
+            const mockupTranslate = progress * 24;
 
             content.style.opacity = String(contentOpacity);
             content.style.transform = `translate3d(0, ${contentTranslate}px, 0) scale(${contentScale})`;
             content.style.willChange = progress > 0 && progress < 1 ? 'opacity, transform' : '';
 
-            mockup.style.opacity = String(mockupOpacity);
-            mockup.style.transform = `translate3d(0, ${mockupTranslate}px, 0) scale(${mockupScale})`;
-            mockup.style.willChange = progress > 0 && progress < 1 ? 'opacity, transform' : '';
+            mockup.style.transform = `translate3d(0, ${mockupTranslate}px, 0)`;
+            mockup.style.willChange = progress > 0 && progress < 1 ? 'transform' : '';
         };
 
         const scheduleUpdate = () => {
@@ -166,27 +171,17 @@ export const HeroSection = () => {
                                 <div className="ml-4 px-3 py-1 bg-background/20 rounded text-xs text-muted-foreground font-mono">bananacanvas-pro.app</div>
                             </div>
 
-                            {/* App Interface */}
+                            {/* App Interface — render only the active theme's image so the
+                                hidden variant is never downloaded (was 2×2.4MB unoptimized). */}
                             <div className="relative bg-background overflow-hidden">
                                 <Image
-                                    src="/hero-image.png"
+                                    src={isDark ? "/hero-image-black.png" : "/hero-image.png"}
                                     alt="BananaCanvas Interface"
                                     width={1920}
                                     height={1080}
-                                    className="w-full h-auto object-cover block dark:hidden"
                                     priority
-                                    quality={85}
-                                    sizes="(max-width: 1280px) 100vw, 1280px"
-                                />
-                                <Image
-                                    src="/hero-image-black.png"
-                                    alt="BananaCanvas Interface"
-                                    width={1920}
-                                    height={1080}
-                                    className="w-full h-auto object-cover hidden dark:block"
-                                    priority
-                                    quality={85}
-                                    sizes="(max-width: 1280px) 100vw, 1280px"
+                                    sizes="(max-width: 1152px) 100vw, 1152px"
+                                    className="w-full h-auto object-cover block"
                                 />
                             </div>
                         </motion.div>

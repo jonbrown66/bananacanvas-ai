@@ -5,7 +5,7 @@ import { Zap, Check, Loader2 } from 'lucide-react';
 import { useRouter } from '@/i18n/routing';
 import { useSupabase } from "@/components/providers/supabase-provider";
 import { useTranslations } from 'next-intl';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
 import { markRouteStart } from '@/lib/perf/client-metrics';
 
@@ -318,13 +318,15 @@ export const PricingSection = ({ plan, notify }: PricingSectionProps) => {
 
                                 <div className="border-t border-border/50 mb-8 w-full relative z-10"></div>
 
-                                <ul className="space-y-4 flex-1 relative z-10">
+                                <ul className="space-y-3.5 flex-1 relative z-10">
                                     {planItem.features.map((feature, fIndex) => (
-                                        <li key={fIndex} className="flex items-start gap-3 text-sm text-foreground/80">
-                                            <div className="mt-0.5">
-                                                <Check size={16} strokeWidth={3} className={planItem.highlight ? "text-brand" : "text-muted-foreground"} />
+                                        <li key={fIndex} className="flex items-center gap-3 text-sm text-foreground/85">
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                                                planItem.highlight ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground"
+                                            }`}>
+                                                <Check size={12} strokeWidth={2.5} className="shrink-0" />
                                             </div>
-                                            <span className="leading-relaxed">{feature}</span>
+                                            <span className="leading-snug">{feature}</span>
                                         </li>
                                     ))}
                                 </ul>

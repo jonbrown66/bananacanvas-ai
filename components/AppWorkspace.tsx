@@ -1,19 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Sidebar } from './Sidebar';
 import { Session as WorkspaceSession, ViewMode, UserProfile, Message } from '../types';
 import { Icons } from './Icons';
-import { generateOrEditImage, parseImageDataUrl, type ImageMimeType } from '../services/geminiService';
+import {
+  generateOrEditImage,
+  resolveImagePayload,
+  uploadWorkspaceImage,
+  type ImageMimeType
+} from '../services/geminiService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../lib/types';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { reportClientMetric } from '@/lib/perf/client-metrics';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m as motion } from 'framer-motion';
 import {
   Tooltip,
   TooltipProvider,
@@ -21,7 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useShallow } from 'zustand/react/shallow';
-import { useWorkspaceStore } from '../lib/store';
+import { useWorkspaceStore, rehydrateWorkspaceStore } from '../lib/store';
 
 type MessageRow = Database['public']['Tables']['messages']['Row'];
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
@@ -76,9 +82,22 @@ export default function App({
   const setCurrentSessionId = useWorkspaceStore(s => s.setCurrentSessionId);
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || 'chat');
+  const [, startTransition] = useTransition();
+
+  const handleViewModeChange = useCallback((nextMode: ViewMode) => {
+    startTransition(() => {
+      setViewMode(nextMode);
+    });
+  }, []);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    startTransition(() => {
+      setCurrentSessionId(sessionId);
+    });
+  }, [setCurrentSessionId]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [appLoading, setAppLoading] = useState(true);
+  const [appLoading, setAppLoading] = useState(() => useWorkspaceStore.getState().sessions.length === 0);
   const [pendingDelete, setPendingDelete] = useState<{
     messageId: string;
     x: number;
@@ -87,6 +106,11 @@ export default function App({
   const inflightMessageLoadsRef = React.useRef<Map<string, Promise<void>>>(new Map());
   const workspaceMountedAtRef = React.useRef(performance.now());
   const shellReadyReportedRef = React.useRef(false);
+
+  // Mount-time rehydration safe from SSR mismatch
+  useEffect(() => {
+    rehydrateWorkspaceStore();
+  }, []);
 
   // Sync state with props (e.g. when session loads)
   useEffect(() => {
@@ -98,6 +122,25 @@ export default function App({
       avatarUrl: (avatarUrl && (prev.avatarUrl === 'https://picsum.photos/200' || !prev.avatarUrl)) ? avatarUrl : prev.avatarUrl
     }));
   }, [userName, userEmail, avatarUrl]);
+
+  // Idle preload chunks for instant tab switching without spinner delays
+  useEffect(() => {
+    const preload = () => {
+      void import('./ChatWorkspace');
+      void import('./CanvasWorkspace');
+      void import('./SettingsWorkspace');
+    };
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        const id = (window as any).requestIdleCallback(preload, { timeout: 1500 });
+        return () => (window as any).cancelIdleCallback?.(id);
+      } else {
+        const timer = setTimeout(preload, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
 
   const loadMessagesForProject = useCallback(async (
     projectId: string,
@@ -231,7 +274,9 @@ export default function App({
         return;
       }
 
-      setAppLoading(true);
+      if (useWorkspaceStore.getState().sessions.length === 0) {
+        setAppLoading(true);
+      }
       const startedAt = performance.now();
       let loadedProjectsCount = 0;
 
@@ -419,7 +464,10 @@ export default function App({
   const currentSession = sessions.find(s => s.id === currentSessionId) || sessions[0] || { messages: [], id: 'temp', title: 'Loading', lastModified: 0 };
 
   // Find the latest image in the current WorkspaceSession for context
-  const latestImage = [...(currentSession.messages || [])].reverse().find(m => m.imageUrl)?.imageUrl || null;
+  const latestImage = React.useMemo(
+    () => [...(currentSession.messages || [])].reverse().find(m => m.imageUrl)?.imageUrl || null,
+    [currentSession.messages]
+  );
 
   const handleNewSession = async () => {
     await createNewSession();
@@ -489,7 +537,7 @@ export default function App({
     return undefined;
   }, [currentSession.messages]);
 
-  const handleRegenerateMessage = useCallback((message: Message) => {
+  const handleRegenerateMessage = useCallback(async (message: Message) => {
     let promptText = "";
     let sourceImage: string | undefined = undefined;
     let parentId = "";
@@ -522,7 +570,7 @@ export default function App({
 
     if (!promptText) return;
 
-    const sourceImagePayload = parseImageDataUrl(sourceImage);
+    const sourceImagePayload = await resolveImagePayload(sourceImage);
 
     if (targetModelId && userMessageId) {
       handleSendMessage(promptText, sourceImagePayload?.base64, "1:1", parentId, true, sourceImagePayload?.mimeType, {
@@ -624,7 +672,7 @@ export default function App({
     ].join('\n');
   }, [currentSession.messages]);
 
-  const handleSendMessage = async (
+  const handleSendMessage = useCallback(async (
     text: string,
     currentImageBase64?: string,
     aspectRatio?: "1:1" | "3:4" | "4:3" | "16:9" | "9:16",
@@ -653,6 +701,13 @@ export default function App({
     setStatusMessage(t('processing'));
 
     try {
+      let userImageUrl: string | undefined;
+      if (currentImageBase64 && !isContextImage) {
+        setStatusMessage('Uploading image...');
+        const uploaded = await uploadWorkspaceImage(currentImageBase64, imageMimeType);
+        userImageUrl = uploaded.imageUrl;
+      }
+
       if (!isReplaceMode) {
         const { data: userRow, error: userError } = await supabase
           .from('messages')
@@ -660,7 +715,7 @@ export default function App({
             project_id: currentSessionId,
             author_role: 'user',
             content: text,
-            image_url: currentImageBase64 && !isContextImage ? `data:${imageMimeType};base64,${currentImageBase64}` : null,
+            image_url: userImageUrl || null,
             aspect_ratio: aspectRatio,
             parent_id: effectiveParentId || null,
             position_x: userPos.x,
@@ -681,7 +736,7 @@ export default function App({
           timestamp: userMessageRow?.created_at ? new Date(userMessageRow.created_at).getTime() : Date.now(),
           parentId: effectiveParentId,
           position: userPos,
-          imageUrl: (currentImageBase64 && !isContextImage) ? `data:${imageMimeType};base64,${currentImageBase64}` : undefined
+          imageUrl: userImageUrl
         };
 
         const updatedMessages = [...currentSession.messages, userMsg];
@@ -917,7 +972,7 @@ export default function App({
       setIsProcessing(false);
       setStatusMessage('');
     }
-  };
+  }, [currentSessionId, currentSession.messages, currentSession.title, t, supabase, touchProject, buildPromptWithContext, setSessions, setStatusMessage]);
 
   if (appLoading) {
     return (
@@ -936,11 +991,11 @@ export default function App({
         <Sidebar
           isOpen={sidebarOpen}
           viewMode={viewMode}
-          setViewMode={setViewMode}
+          setViewMode={handleViewModeChange}
           onNewSession={handleNewSession}
           sessions={sessions}
           currentSessionId={currentSessionId}
-          onSelectSession={setCurrentSessionId}
+          onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
           userProfile={userProfile}
           onLogout={onLogout}
@@ -950,7 +1005,18 @@ export default function App({
         />
 
         <div className="flex-1 flex flex-col relative min-w-0">
-          <>
+          {/* Workspace surface transition: keyed fade+rise keeps the spatial
+              relationship between modes readable without making users wait.
+              MotionConfig (providers) handles reduced-motion globally. */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={currentSession.isLoaded ? viewMode : 'session-loading'}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="flex-1 flex flex-col min-h-0"
+            >
             {!currentSession.isLoaded ? (
               <div
                 key="session-loading"
@@ -1030,8 +1096,8 @@ export default function App({
                 className="flex-1 flex flex-col h-full overflow-hidden"
               >
                 <SettingsWorkspace onNavigate={(sessionId) => {
-                  setCurrentSessionId(sessionId);
-                  setViewMode('chat');
+                  handleSelectSession(sessionId);
+                  handleViewModeChange('chat');
                 }} />
               </div>
             ) : (
@@ -1051,54 +1117,55 @@ export default function App({
                 />
               </div>
             )}
-          </>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
-      <AnimatePresence>
-        {pendingDelete && (
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 18 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed z-[80] w-[240px] md:w-[260px]"
+      {/* Delete confirmation anchored near the click point. Radix Dialog gives
+          focus trap, Escape handling and aria wiring without a new dependency. */}
+      <DialogPrimitive.Root
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[79] bg-black/10" />
+          <DialogPrimitive.Content
+            className="fixed z-[80] w-[240px] md:w-[260px] rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-xl p-3 focus:outline-none"
             style={{
-              left: `${Math.min(Math.max(8, pendingDelete.x + 10), (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280)}px`,
-              top: `${Math.min(Math.max(8, pendingDelete.y + 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - 120)}px`
+              left: pendingDelete
+                ? `${Math.min(Math.max(8, pendingDelete.x + 10), (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280)}px`
+                : '0px',
+              top: pendingDelete
+                ? `${Math.min(Math.max(8, pendingDelete.y + 10), (typeof window !== 'undefined' ? window.innerHeight : 800) - 120)}px`
+                : '0px'
             }}
+            aria-describedby={undefined}
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="确认删除"
-              className="rounded-xl border border-border/80 bg-popover/95 backdrop-blur-md shadow-xl p-3"
-            >
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-foreground">
-                  请确认是否删除？
-                </p>
-              </div>
-              <div className="mt-2.5 flex items-center justify-end gap-1.5">
+            <DialogPrimitive.Title className="text-xs font-medium text-foreground">
+              {t('deleteMessageConfirm')}
+            </DialogPrimitive.Title>
+            <div className="mt-2.5 flex items-center justify-end gap-1.5">
+              <DialogPrimitive.Close asChild>
                 <button
                   type="button"
-                  onClick={() => setPendingDelete(null)}
-                  className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-border bg-muted/50 text-foreground hover:bg-muted transition-colors"
+                  className="h-7 px-3 text-xs font-medium rounded-lg border border-border bg-muted/60 text-foreground hover:bg-muted active:scale-95 transition-all flex items-center justify-center"
                 >
                   {tSecurity('cancel')}
                 </button>
-                <button
-                  type="button"
-                  onClick={confirmDeleteMessage}
-                  className="px-2.5 py-1 text-[11px] font-semibold rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity inline-flex items-center gap-1"
-                >
-                  <Trash2 size={12} />
-                  {t('delete')}
-                </button>
-              </div>
+              </DialogPrimitive.Close>
+              <button
+                type="button"
+                onClick={confirmDeleteMessage}
+                autoFocus
+                className="h-7 px-3 text-xs font-semibold rounded-lg bg-destructive text-destructive-foreground hover:opacity-90 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+              >
+                <Trash2 size={12} className="shrink-0" />
+                {t('delete')}
+              </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </TooltipProvider>
   );
 }

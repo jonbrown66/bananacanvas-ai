@@ -1,4 +1,10 @@
 {
+  "ignorePatterns": [
+    "dist/**",
+    ".next/**",
+    "reports/**",
+    "node_modules/**"
+  ],
   "extends": [
     "next/core-web-vitals",
     "next/typescript"
@@ -11,6 +17,7 @@
     "react-hooks/exhaustive-deps": "off",
     "@next/next/no-img-element": "off",
     "@next/next/no-html-link-for-pages": "off",
-    "react/display-name": "off"
+    "react/display-name": "off",
+    "@typescript-eslint/no-require-imports": "off"
   }
 }
